@@ -4,7 +4,7 @@
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-active-success.svg)  
 
-Breaking free from Microsoft is hard. MSFT does everything they can to lock you in. This Backup Tool is for OneDrive users with a lot of data on OneDrive, who want an easy way to download all that data at once but don't have space on their local machine to do so.  
+Breaking free from Microsoft is hard. MSFT does everything they can to lock you in. This Backup Tool is for OneDrive users with a lot of data on OneDrive, who want an easy way to download/export all that data at once but don't have space on their local machine to do so.  
   
 This Python script will automatically backup your entire OneDrive (for personal accounts) to an external hard drive of your choice, and preserve your exact OneDrive folder structure.
 
