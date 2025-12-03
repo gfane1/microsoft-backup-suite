@@ -189,30 +189,6 @@ Pull requests welcome! Please ensure:
 - Add tests for new features
 - Update documentation
 
-- By making a contribution to this project, you certify that:
-
-    (a) The contribution was created in whole or in part by you and you
-    have the right to submit it under the open source license
-    indicated in the repository; or
-
-    (b) The contribution is based upon previous work that, to the best
-    of your knowledge, is covered under an appropriate open source
-    license and you have the right under that license to submit that
-    work with modifications, whether created in whole or in part
-    by you, under the same open source license (unless you am
-    permitted to submit under a different license), as indicated
-    in the repository; or
-
-    (c) The contribution was provided directly to you by some other
-    person who certified (a), (b) or (c) and you have not modified
-    it.
-
-    (d) You understand and agree that this project and the contribution
-    are public and that a record of the contribution (including all
-    personal information you submit with it, including your sign-off) is
-    maintained indefinitely and may be redistributed consistent with
-    this project or the open source license(s) involved.
-
 ## License
 
 MIT License - feel free to use and modify as needed.
