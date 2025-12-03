@@ -10,7 +10,11 @@ A Python script to automatically backup your entire OneDrive (personal accounts)
 ✅ **Real-time progress tracking**  
 ✅ **Handles large backups** (500GB+)  
 ✅ **Supports documents and pictures** (configurable file types)  
-✅ **Runs locally, does not store ANY credentials or content**
+🔒 This tool runs entirely on your local machine.  
+   - No credentials are stored or transmitted to any third party  
+   - No file content is uploaded to any server  
+   - All data stays between your computer, Microsoft's servers, and your external drive  
+   - Your Azure app credentials are only used for direct authentication with Microsoft  
 
 ## Requirements
 
