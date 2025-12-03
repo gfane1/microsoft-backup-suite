@@ -30,8 +30,8 @@ This Python script will automatically backup your entire OneDrive (for personal 
 
 1. Clone this repository:
 ```bash
-git clone https://github.com/yourusername/onedrive-backup.git
-cd onedrive-backup
+git clone https://github.com/davidninow/onedrive_backup_tool.git
+cd onedrive_backup_tool
 ```
 
 2. Install required dependencies:
