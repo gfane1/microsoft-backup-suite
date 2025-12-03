@@ -114,6 +114,7 @@ def download_file(url: str, destination: Path) -> bool:
 ## Areas We'd Love Help With
 
 ### High Priority
+- [ ] GUI version for non-technical users
 - [ ] Support for work/school OneDrive accounts
 - [ ] Incremental backup (only download changed files)
 - [ ] Compression options for backups
@@ -122,7 +123,6 @@ def download_file(url: str, destination: Path) -> bool:
 - [ ] Scheduled/automated backups
 
 ### Medium Priority
-- [ ] GUI version for non-technical users
 - [ ] Support for shared folders
 - [ ] Backup verification/integrity checks
 - [ ] Multi-threaded downloads
@@ -181,10 +181,10 @@ Feel free to:
 
 ### Our Standards
 
-- Be respectful and inclusive
+- Be respectful
 - Welcome newcomers and help them learn
 - Focus on what's best for the community
-- Show empathy towards others
+- Show empathy and kindness towards all, not just those you like
 - Accept constructive criticism gracefully
 
 ### Unacceptable Behavior
