@@ -51,17 +51,18 @@ Before using the script, you need to create an Azure app registration:
 
 1. Go to [Microsoft Entra Admin Center](https://entra.microsoft.com/)
 2. Sign in with your personal Microsoft account
-3. Navigate to **App registrations** → **+ New registration**
-4. Fill out the form:
+3. Look for "App registrations" in the left sidebar (or search for it)
+4. Click "+ New registration" button at the top
+5. Fill out the form:
    - **Name:** `OneDrive Backup Tool`
    - **Supported account types:** "Accounts in any organizational directory and personal Microsoft accounts"
    - **Redirect URI:** Platform: `Web`, URI: `http://localhost:8080`
-5. Click **Register**
+6. Click **Register**
 
-### Step 2: Get Application (Client) ID
+### Step 2: Get Application (Client) ID 
 
-1. On the app's **Overview** page, copy the **Application (client) ID**
-2. Save this - you'll need it when running the script
+1. On the app's **Overview** page, copy the **Application (client) ID** (it's a long string like `12345678-1234-1234-1234-123456789abc`)
+2. Save this somewhere (Notepad, Notes, etc.) - you'll need it when running the script
 
 ### Step 3: Create Client Secret
 
@@ -71,7 +72,7 @@ Before using the script, you need to create an Azure app registration:
 4. Expiration: `24 months`
 5. Click **Add**
 6. **IMMEDIATELY copy the Value** (you can only see it once!)
-7. You can copy the Secret ID if you want, but you won't need it for this process
+7. Note: You can copy the Secret ID too if you want, but you won't need it for this process
 8. Save this with your Client ID
 
 ### Step 4: Set API Permissions
@@ -80,11 +81,11 @@ Before using the script, you need to create an Azure app registration:
 2. Click **+ Add a permission**
 3. Select **Microsoft Graph**
 4. Select **Delegated permissions**
-5. Search for and add these permissions:
+5. Search and click the checkbox for these permissions:
    - `Files.Read.All`
    - `offline_access`
 6. Click **Add permissions**
-7. Click **Grant admin consent** and confirm
+7. Click **Grant admin consent for [your account]** and confirm
 
 You should see green checkmarks next to all permissions.
 
