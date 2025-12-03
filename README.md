@@ -65,7 +65,8 @@ Before using the script, you need to create an Azure app registration:
 4. Expiration: `24 months`
 5. Click **Add**
 6. **IMMEDIATELY copy the Value** (you can only see it once!)
-7. Save this with your Client ID
+7. You can copy the Secret ID if you want, but you won't need it for this process
+8. Save this with your Client ID
 
 ### Step 4: Set API Permissions
 
