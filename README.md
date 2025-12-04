@@ -1,210 +1,364 @@
-# OneDrive Backup Tool
+# Microsoft Personal Backup Suite
 
-![Python](https://img.shields.io/badge/python-3.6+-blue.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Status](https://img.shields.io/badge/status-active-success.svg)  
+A comprehensive toolkit to export and backup your Microsoft personal data (OneDrive files and OneNote notebooks) to local or external drives. Keep control of your data with these easy-to-use Python tools.
 
-Breaking free from Microsoft is hard. MSFT does everything they can to lock you in. This Backup Tool is for OneDrive users with a lot of data on OneDrive, who want an easy way to download/export all that data at once but don't have space on their local machine to do so.  
-  
-This privacy-first Python script will automatically backup your entire OneDrive (for personal accounts) to an external hard drive of your choice, and preserve your exact OneDrive folder structure.
+## 🎯 What's Included
 
-## Features
+### 📁 OneDrive Backup Tool
+Automatically backup your entire OneDrive (personal accounts) to an external drive, preserving the exact folder structure.
 
-✅ **Automatic authentication** via Microsoft Graph API  
-✅ **Preserves folder structure** exactly as in OneDrive  
-✅ **Auto-refreshing tokens** - can run for days/weeks without re-authentication  
-✅ **Real-time progress tracking**  
-✅ **Handles large backups** (500GB+)  
-✅ **Supports documents and pictures** (configurable file types)  
-✅ **Resume capability** - automatically continues from where it left off if interrupted  
-🔒 This tool runs entirely on your local machine.  
-   - No credentials are stored or transmitted to any third party  
-   - No file content is uploaded to any server  
-   - All data stays between your computer, Microsoft's servers, and your external drive  
-   - Your Azure app credentials are only used for direct authentication with Microsoft  
+**Features:**
+- ✅ Automatic authentication via Microsoft Graph API
+- ✅ Preserves folder structure exactly as in OneDrive
+- ✅ Auto-refreshing tokens - can run for days/weeks
+- ✅ Real-time progress tracking
+- ✅ Handles large backups (500GB+)
+- ✅ Resume capability for interrupted downloads
 
-## Requirements
+### 📓 OneNote Exporter
+Export your entire OneNote notebooks with all attachments (images, audio recordings, PDFs, web links) for importing into popular note-taking apps.
 
+**Features:**
+- ✅ Exports all notebooks, sections, and pages
+- ✅ Downloads all attachments (images, audio, PDFs)
+- ✅ Multiple output formats (Markdown, ENEX, HTML)
+- ✅ Works with Joplin, Evernote, Notion, Obsidian
+- ✅ Automatic token refresh for long exports
+- ✅ Preserves metadata (dates, authors)
+
+## 🚀 Quick Start
+
+### Prerequisites
 - Python 3.6+
-- External hard drive with sufficient space
-- Microsoft personal account with OneDrive
-- Azure app registration (free, one-time setup)
+- Microsoft personal account
+- Azure app registration(s) - **free, one-time setup**
+- External drive (for OneDrive backup) or destination folder
 
-## Installation
+### Installation
 
-1. Clone this repository:
 ```bash
-git clone https://github.com/davidninow/onedrive_backup_tool.git
-cd onedrive_backup_tool
-```
+# Clone the repository
+git clone https://github.com/davidninow/microsoft-backup-suite.git
+cd microsoft-backup-suite
 
-2. Install required dependencies:
-```bash
+# Install dependencies
 pip install requests
 ```
 
-## Azure Setup (One-Time)
+### OneDrive Backup
 
-Before using the script, you need to create an Azure app registration:
-
-### Step 1: Create App Registration
-
-1. Go to [Microsoft Entra Admin Center](https://entra.microsoft.com/)
-2. Sign in with your personal Microsoft account
-3. Look for "App registrations" in the left sidebar (or search for it)
-4. Click "+ New registration" button at the top
-5. Fill out the form:
-   - **Name:** `OneDrive Backup Tool`
-   - **Supported account types:** "Accounts in any organizational directory and personal Microsoft accounts"
-   - **Redirect URI:** Platform: `Web`, URI: `http://localhost:8080`
-6. Click **Register**
-
-### Step 2: Get Application (Client) ID 
-
-1. On the app's **Overview** page, copy the **Application (client) ID** (it's a long string like `12345678-1234-1234-1234-123456789abc`)
-2. Save this somewhere (Notepad, Notes, etc.) - you'll need it when running the script
-
-### Step 3: Create Client Secret
-
-1. Go to **Certificates & secrets** (left sidebar)
-2. Click **+ New client secret**
-3. Description: `OneDrive Backup Secret`
-4. Expiration: `24 months`
-5. Click **Add**
-6. **IMMEDIATELY copy the Value** (you can only see it once!)
-7. Note: You can copy the Secret ID too if you want, but you won't need it for this process
-8. Save this with your Client ID
-
-### Step 4: Set API Permissions
-
-1. Go to **API permissions** (left sidebar)
-2. Click **+ Add a permission**
-3. Select **Microsoft Graph**
-4. Select **Delegated permissions**
-5. Search and click the checkbox for these permissions:
-   - `Files.Read.All`
-   - `offline_access`
-6. Click **Add permissions**
-7. Click **Grant admin consent for [your account]** and confirm
-
-You should see green checkmarks next to all permissions.
-
-## Usage
-
-### Basic Usage
-
-Run the script:
 ```bash
+cd onedrive-backup
 python3 onedrive_backup.py
 ```
 
-Follow the prompts:
-1. Choose option **2** (Login to OneDrive online)
-2. Choose option **1** (App Credentials)
-3. Enter your **Application (client) ID**
-4. Enter your **Client Secret**
-5. Enter `common` for Tenant ID
-6. Browser opens - sign in and approve permissions
-7. Copy the redirect URL from browser and paste into terminal
-8. Enter your external drive path (e.g., `/Volumes/MyDrive`)
-9. Choose what to backup (documents, pictures, or both)
-10. Let it run!
+Follow the prompts to:
+1. Authenticate with your Microsoft account
+2. Select your external drive
+3. Choose what to backup (documents, pictures, or both)
 
-### What Gets Backed Up
+**📖 Full documentation:** See `onedrive-backup/README.md`
 
-By default, the script backs up:
+### OneNote Export
 
-**Documents:**
-- PDF, Word (.docx, .doc), Excel (.xlsx, .xls)
-- PowerPoint (.pptx, .ppt), Text files (.txt)
-- CSV, RTF, ODT
-
-**Pictures:**
-- JPG, JPEG, PNG, GIF, BMP
-- TIFF, SVG, WebP, HEIC, RAW
-
-You can modify these file types in the script if needed.
-
-## How It Works
-
-1. **Authentication:** Uses OAuth 2.0 with delegated permissions
-2. **Token Management:** Automatically refreshes access tokens (valid for 90 days)
-3. **API Calls:** Uses Microsoft Graph API to list and download files
-4. **Structure Preservation:** Recreates exact OneDrive folder hierarchy on external drive
-5. **Progress Tracking:** Shows real-time file counts and paths
-
-## Output Structure
-
-Your backup will be organized exactly as in OneDrive:
-
-```
-/Volumes/YourDrive/OneDrive_Backup_20241203_051234/
-├── Work/
-│   ├── Projects/
-│   │   ├── Report.docx
-│   │   └── Data.xlsx
-│   └── Presentations/
-├── Personal/
-│   ├── Photos/
-│   │   ├── 2023/
-│   │   └── 2024/
-│   └── Documents/
-└── [your exact OneDrive structure]
+```bash
+cd onenote-exporter
+python3 onenote_exporter.py
 ```
 
-## Troubleshooting
+Follow the prompts to:
+1. Authenticate with your Microsoft account
+2. Choose destination folder
+3. Select export format (Joplin, Evernote, both)
 
-### "Token expired" error
-The script automatically refreshes tokens. If this fails, you may need to re-authenticate (run the script again).
+**📖 Full documentation:** See `onenote-exporter/README.md`
 
-### "Destination drive not found"
-Make sure your external drive is connected and mounted. Use the exact path shown in Finder.
+## 📦 Repository Structure
 
-### "Invalid client secret"
-You copied the Secret ID instead of the Value. Go back to Azure and create a new client secret, then copy the **Value** column.
+```
+microsoft-backup-suite/
+├── README.md                    # This file
+├── LICENSE.md                   # MIT License
+├── CONTRIBUTING.md              # Contribution guidelines
+│
+├── onedrive-backup/            # OneDrive backup tool
+│   ├── README.md               # Detailed OneDrive docs
+│   ├── onedrive_backup.py      # Main backup script
+│   └── requirements.txt        # Dependencies
+│
+└── onenote-exporter/           # OneNote export tool
+    ├── README.md               # Main overview & getting started
+    ├── README_ONENOTE.md       # Full documentation
+    ├── QUICKSTART.md           # 5-minute setup guide
+    ├── SETUP_GUIDE.md          # Complete setup guide
+    ├── MIGRATION_GUIDE.md      # App comparison & import guide
+    ├── PROJECT_SUMMARY.md      # Package overview
+    ├── onenote_exporter.py     # Main export script
+    ├── advanced_examples.py    # Custom export scenarios
+    └── requirements.txt        # Dependencies
+```
 
-### Browser doesn't open
-Make sure `webbrowser` module is available (it's built into Python). Try running in a different terminal.  
+## 🔧 Azure Setup
 
-### Script was interrupted  
-If the backup stops for any reason (power loss, crash, Ctrl+C), simply run the script again with the same settings. It will automatically resume from where it left off. Progress is saved every 10 files in a hidden `.progress.json` file in your backup folder.  
-  
-### Token keeps refreshing without downloading  
-This can happen during initial folder scanning if you have many folders. The script will eventually stabilize and begin downloading. If it refreshes more than 6 times in a row, stop the script (Ctrl+C) and restart it.  
+Both tools require Azure app registrations with different permissions. You'll need to create **two separate apps** (one for each tool):
 
-## Security Notes
+### For OneDrive Backup
+**Permissions needed:**
+- `Files.Read.All` (Delegated)
+- `offline_access` (Delegated)
 
-- Your Client Secret should be kept private (don't commit to public repos)
-- Access tokens expire after ~75 minutes
-- Refresh tokens last 90 days and auto-renew when used
-- The script never stores your Microsoft password
-- All authentication uses official Microsoft OAuth flows
+### For OneNote Exporter  
+**Permissions needed:**
+- `Notes.Read` (Delegated)
+- `Notes.Read.All` (Delegated)
+- `offline_access` (Delegated)
 
-## Limitations
+**📖 Detailed setup instructions:**
+- OneDrive: See `onedrive-backup/README.md`
+- OneNote: See `onenote-exporter/QUICKSTART.md`
 
-- Personal Microsoft accounts only (work/school accounts have different requirements)
-- Requires interactive login once per session
-- Download speed depends on your internet connection
-- Large files may take time to download
+## 🎯 Use Cases
 
-## Contributing
+### Scenario 1: Full Microsoft Data Backup
+```bash
+# 1. Backup OneDrive files
+cd onedrive-backup
+python3 onedrive_backup.py
 
-Pull requests welcome! Please ensure:
-- Code follows existing style
-- Add tests for new features
-- Update documentation
+# 2. Export OneNote notebooks
+cd ../onenote-exporter
+python3 onenote_exporter.py
+```
 
-## License
+**Result:** Complete backup of your Microsoft personal data!
 
-MIT License - feel free to use and modify as needed.
+### Scenario 2: Migrate to Open Platforms
+Use this suite to:
+- Move files from OneDrive → Local storage / Other cloud
+- Move notes from OneNote → Joplin, Obsidian, Evernote
 
-## Credits
+**Freedom from vendor lock-in!** 🎉
 
-Created to solve the challenge of backing up large OneDrive accounts without local storage space.
+### Scenario 3: Regular Backups
+Schedule these scripts to run regularly:
+- Weekly OneDrive backups to external drive
+- Monthly OneNote exports for archival
 
-## Support
+### Scenario 4: Account Transition
+Moving to a new account or leaving Microsoft ecosystem:
+- Export everything before closing account
+- Import to new platforms
+- Keep your data forever
 
-For issues or questions:
-1. Check the Troubleshooting section above
-2. Review Microsoft Graph API documentation
-3. Open an issue on GitHub
+## 🔐 Security & Privacy
+
+Both tools follow security best practices:
+
+- ✅ **OAuth 2.0 authentication** - Industry standard
+- ✅ **No passwords stored** - Only temporary tokens
+- ✅ **Tokens expire automatically** - Access tokens last ~75 minutes
+- ✅ **Local data only** - Nothing sent to third parties
+- ✅ **Open source** - Review the code yourself
+- ✅ **Read-only access** - Scripts never modify your Microsoft data
+
+### Data Flow
+```
+Your Microsoft Account 
+    ↓ (OAuth authentication)
+Microsoft Graph API
+    ↓ (Secure download)
+Your Computer (Local Storage)
+    ↓ (Optional)
+External Drive / Import to Other Apps
+```
+
+## 📊 Comparison: OneDrive vs OneNote Tools
+
+| Feature | OneDrive Backup | OneNote Exporter |
+|---------|----------------|------------------|
+| **What it backs up** | Files & folders | Notes & notebooks |
+| **Output format** | Original files | Markdown/ENEX/HTML |
+| **Typical size** | GB to TB | MB to GB |
+| **Backup time** | Varies by size | 5-30 minutes |
+| **Best for** | File preservation | Note migration |
+| **Destination** | External drive | Import to other apps |
+
+## 💡 Pro Tips
+
+### For Both Tools
+1. **Test first** - Start with small backups/exports
+2. **Stable internet** - Both need reliable connection
+3. **Keep originals** - Don't delete Microsoft data for 30 days
+4. **Check output** - Verify before deleting sources
+
+### OneDrive Specific
+- Use Files On-Demand carefully (may skip cloud-only files)
+- Consider using online login for complete backup
+- External drive needs sufficient space (check OneDrive size)
+
+### OneNote Specific
+- Read MIGRATION_GUIDE.md to choose target app
+- Export format depends on destination (Joplin vs Evernote)
+- Audio/video files take longest to download
+
+## 🆘 Troubleshooting
+
+### Common Issues (Both Tools)
+
+**"Authentication failed"**
+- Verify you copied the Secret VALUE (not ID) from Azure
+- Check API permissions are granted (green checkmarks)
+- Make sure Redirect URI is `http://localhost:8080`
+
+**"Python not found"**
+```bash
+# Try python3 instead of python
+python3 --version
+```
+
+**"Can't install requests"**
+```bash
+# Try with user flag
+pip install --user requests
+
+# Or use pip3
+pip3 install requests
+```
+
+### Tool-Specific Issues
+
+**OneDrive: "Online-only files skipped"**
+- Download files in OneDrive first, OR
+- Use online login option in script
+
+**OneNote: "No notebooks found"**
+- Verify notebooks exist at https://www.onenote.com
+- Check Azure app has Notes.Read permissions
+- Try re-authenticating
+
+**For detailed troubleshooting:**
+- OneDrive: See `onedrive-backup/README.md`
+- OneNote: See `onenote-exporter/README_ONENOTE.md`
+
+## 📖 Documentation
+
+### OneDrive Backup
+- **README.md** - Complete documentation with setup, usage, troubleshooting
+
+### OneNote Exporter
+- **README.md** - Main overview and getting started
+- **QUICKSTART.md** - 5-minute setup guide (start here!)
+- **SETUP_GUIDE.md** - Comprehensive setup and usage
+- **README_ONENOTE.md** - Full documentation
+- **MIGRATION_GUIDE.md** - Compare Joplin, Evernote, Notion, Obsidian
+- **PROJECT_SUMMARY.md** - Package overview
+- **advanced_examples.py** - Custom export scenarios (with code)
+
+### General
+- **LICENSE.md** - MIT License
+- **CONTRIBUTING.md** - How to contribute
+
+## 🤝 Contributing
+
+Contributions are welcome! Here's how you can help:
+
+### For Both Tools
+- 🐛 Report bugs
+- 💡 Suggest features
+- 📖 Improve documentation
+- 🔧 Submit pull requests
+
+### Specific Areas
+- **OneDrive:** Work/school account support, incremental backups
+- **OneNote:** Better format conversion, direct app imports, GUI
+
+**See CONTRIBUTING.md for guidelines**
+
+## 🗺️ Roadmap
+
+### OneDrive Backup
+- [ ] Work/school OneDrive support
+- [ ] Incremental backup (only changed files)
+- [ ] Compression options
+- [ ] Scheduled backups
+- [ ] GUI version
+
+### OneNote Exporter
+- [ ] Selective export (specific notebooks)
+- [ ] Better Markdown conversion
+- [ ] Direct API import to target apps
+- [ ] GUI interface
+- [ ] Progress bar with ETA
+
+### Shared Improvements
+- [ ] Common authentication module
+- [ ] Unified configuration file
+- [ ] Combined CLI tool
+- [ ] Docker containers
+- [ ] Web interface
+
+## 📝 License
+
+MIT License - Free to use and modify for personal or commercial purposes.
+
+See [LICENSE.md](LICENSE.md) for details.
+
+## 🙏 Acknowledgments
+
+- **Microsoft Graph API** - For providing access to personal data
+- **Open source community** - For libraries and inspiration
+- **Users** - For feedback and contributions
+
+## ⭐ Show Your Support
+
+If these tools help you:
+- ⭐ Star this repository
+- 🐛 Report issues
+- 💬 Share with others
+- 🤝 Contribute improvements
+
+## 📞 Support & Contact
+
+- 🐛 **Bug reports:** Open an issue on GitHub
+- 💡 **Feature requests:** Open an issue with "enhancement" label
+- 📖 **Documentation:** Check tool-specific README files
+- 💬 **Questions:** Open a discussion on GitHub
+
+## 🎯 Quick Links
+
+- [OneDrive Backup README](onedrive-backup/README.md)
+- [OneNote Exporter Quick Start](onenote-exporter/QUICKSTART.md)
+- [OneNote Migration Guide](onenote-exporter/MIGRATION_GUIDE.md)
+- [Contributing Guidelines](CONTRIBUTING.md)
+- [License](LICENSE.md)
+
+---
+
+## 🚀 Ready to Get Started?
+
+### Option 1: Backup OneDrive
+```bash
+cd onedrive-backup
+python3 onedrive_backup.py
+```
+
+### Option 2: Export OneNote
+```bash
+cd onenote-exporter
+python3 onenote_exporter.py
+```
+
+### Option 3: Do Both!
+```bash
+# Complete data liberation
+cd onedrive-backup && python3 onedrive_backup.py
+cd ../onenote-exporter && python3 onenote_exporter.py
+```
+
+**Your data, your control!** 🎉
+
+---
+
+**Made with ❤️ for people who believe in data freedom and portability**
+
+*"The best time to backup your data was yesterday. The second best time is now."*
