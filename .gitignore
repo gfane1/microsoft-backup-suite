@@ -117,6 +117,17 @@ client_secret.json
 config.ini
 .env.local
 
+# Backup and export files
+   *_Backup_*/
+   *_Export_*/
+   OneDrive_Backup_*/
+   OneNote_Export_*/
+   .progress.json
+   
+   # Credentials
+   *.json
+   client_secret*.json
+
 # Backup logs
 backup_log.json
 *.log
