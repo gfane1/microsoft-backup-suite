@@ -347,12 +347,26 @@ class OneDriveBackup:
         copied_files = len(self.downloaded_files)
         api_call_count = 0
         consecutive_refresh_failures = 0
+        scanned_files = 0
         
         def save_progress():
             """Save current progress to file"""
+            # If progress file exists, merge with existing data
+            existing_files = set()
+            if self.progress_file.exists():
+                try:
+                    with open(self.progress_file, 'r') as f:
+                        existing_data = json.load(f)
+                        existing_files = set(existing_data.get('downloaded_files', []))
+                except:
+                    pass
+            
+            # Merge existing and new downloaded files
+            all_downloaded = existing_files | self.downloaded_files
+            
             with open(self.progress_file, 'w') as f:
                 json.dump({
-                    'downloaded_files': list(self.downloaded_files),
+                    'downloaded_files': list(all_downloaded),
                     'timestamp': datetime.now().isoformat()
                 }, f)
         
@@ -377,6 +391,11 @@ class OneDriveBackup:
                             print("❌ Failed to refresh token 3 times. Exiting.")
                             return None
                 
+                # If forbidden, might be a permissions issue with shared folder
+                if response.status_code == 403:
+                    print(f"\n⚠️  Access denied (403) - might lack permissions for this item")
+                    return response
+                
                 # Success - reset failure counter
                 if response.status_code == 200:
                     consecutive_refresh_failures = 0
@@ -385,14 +404,19 @@ class OneDriveBackup:
                 
             except requests.exceptions.Timeout:
                 print(f"\n⏱️  Request timeout for {url[:50]}... Retrying...")
-                return make_api_request(url)  # Retry once
+                import time
+                time.sleep(2)
+                try:
+                    return requests.get(url, headers=headers, timeout=60)  # Longer timeout on retry
+                except:
+                    return None
             except requests.exceptions.RequestException as e:
                 print(f"\n❌ Network error: {e}")
                 return None
         
         try:
             def download_folder(url, local_path, depth=0):
-                nonlocal total_files, copied_files
+                nonlocal total_files, copied_files, scanned_files
                 
                 print(f"{'  ' * depth}📂 Scanning folder: {local_path.name or 'root'}...")
                 
@@ -412,8 +436,18 @@ class OneDriveBackup:
                     if 'remoteItem' in item and 'folder' in item.get('remoteItem', {}):
                         # It's a shared folder
                         remote_item = item['remoteItem']
+                        
+                        # Check if we have the necessary IDs
+                        if 'parentReference' not in remote_item or 'driveId' not in remote_item['parentReference']:
+                            print(f"{'  ' * depth}⚠️  Skipping shared folder (missing driveId): {name}")
+                            continue
+                        
                         remote_drive_id = remote_item['parentReference']['driveId']
-                        remote_item_id = remote_item['id']
+                        remote_item_id = remote_item.get('id')
+                        
+                        if not remote_item_id:
+                            print(f"{'  ' * depth}⚠️  Skipping shared folder (missing itemId): {name}")
+                            continue
                         
                         new_local_path = local_path / name
                         new_local_path.mkdir(exist_ok=True, parents=True)
@@ -421,7 +455,13 @@ class OneDriveBackup:
                         # Access shared folder using its remote drive/item IDs
                         children_url = f"https://graph.microsoft.com/v1.0/drives/{remote_drive_id}/items/{remote_item_id}/children"
                         print(f"{'  ' * depth}🔗 Accessing shared folder: {name}")
-                        download_folder(children_url, new_local_path, depth + 1)
+                        
+                        # Try accessing, but don't fail the whole backup if it doesn't work
+                        try:
+                            download_folder(children_url, new_local_path, depth + 1)
+                        except Exception as e:
+                            print(f"{'  ' * depth}⚠️  Could not access shared folder '{name}': {e}")
+                            continue
                     
                     elif 'folder' in item:
                         # It's a regular folder, recurse and preserve structure
@@ -441,13 +481,18 @@ class OneDriveBackup:
                             should_download = True
                         
                         if should_download:
-                            total_files += 1
+                            scanned_files += 1
+                            
+                            # Show scan progress every 100 files
+                            if scanned_files % 100 == 0:
+                                print(f"  ⏳ Scanned {scanned_files} files, found {total_files} to download...", end='\r')
                             
                             # Skip if already downloaded
                             if item_id in self.downloaded_files:
-                                # Silent skip - don't print anything
+                                # Silent skip - don't count or print
                                 continue
                             
+                            total_files += 1
                             download_url = item.get('@microsoft.graph.downloadUrl')
                             
                             if download_url:
@@ -457,6 +502,19 @@ class OneDriveBackup:
                                     file_path.parent.mkdir(parents=True, exist_ok=True)
                                     
                                     file_response = requests.get(download_url, timeout=300)
+                                    
+                                    # If 401, the download URL expired - get a fresh one
+                                    if file_response.status_code == 401:
+                                        print(f"  {'  ' * depth}🔄 {name}: URL expired, refreshing...")
+                                        # Get fresh item data with new download URL
+                                        item_url = f"https://graph.microsoft.com/v1.0/me/drive/items/{item_id}"
+                                        fresh_response = make_api_request(item_url)
+                                        if fresh_response and fresh_response.status_code == 200:
+                                            fresh_item = fresh_response.json()
+                                            fresh_download_url = fresh_item.get('@microsoft.graph.downloadUrl')
+                                            if fresh_download_url:
+                                                file_response = requests.get(fresh_download_url, timeout=300)
+                                    
                                     if file_response.status_code == 200:
                                         with open(file_path, 'wb') as f:
                                             f.write(file_response.content)
@@ -470,6 +528,23 @@ class OneDriveBackup:
                                         # Show relative path from backup root
                                         rel_path = file_path.relative_to(backup_root)
                                         print(f"  [{'  ' * depth}{copied_files}/{total_files}] ✓ {rel_path}")
+                                    elif file_response.status_code == 503:
+                                        # Service unavailable - retry after delay
+                                        print(f"  {'  ' * depth}⏳ {name}: Service busy, retrying in 5s...")
+                                        import time
+                                        time.sleep(5)
+                                        retry_response = requests.get(download_url, timeout=300)
+                                        if retry_response.status_code == 200:
+                                            with open(file_path, 'wb') as f:
+                                                f.write(retry_response.content)
+                                            copied_files += 1
+                                            self.downloaded_files.add(item_id)
+                                            if copied_files % 10 == 0:
+                                                save_progress()
+                                            rel_path = file_path.relative_to(backup_root)
+                                            print(f"  [{'  ' * depth}{copied_files}/{total_files}] ✓ {rel_path}")
+                                        else:
+                                            print(f"  {'  ' * depth}✗ {name}: Download failed (status {retry_response.status_code})")
                                     else:
                                         print(f"  {'  ' * depth}✗ {name}: Download failed (status {file_response.status_code})")
                                 except Exception as e:
