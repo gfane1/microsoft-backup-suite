@@ -14,7 +14,7 @@ New in v2.0:
 - ✅ **Interactive retry** - Retry without exiting
 - ✅ **Desktop app** - Beautiful Electron GUI
 
-[See OneDrive v2.0 CHANGELOG](onedrive-backup/CHANGELOG.md)
+See full [CHANGELOG](https://github.com/davidninow/microsoft-backup-suite/blob/main/CHANGELOG.md) | [Detailed fixes](/docs)
 
 ---
 
@@ -56,9 +56,9 @@ Export your entire OneNote notebooks with all attachments (images, audio recordi
 
 | Platform | Download | Size |
 |----------|----------|------|
-| **macOS** | [OneDrive-Backup-2.0.0.dmg](#) | 100 MB |
-| **Windows** | [OneDrive-Backup-Setup-2.0.0.exe](#) | 80 MB |
-| **Linux** | [onedrive-backup_2.0.0_amd64.deb](#) | 70 MB |
+| **macOS** | [OneDrive-Backup-2.0.0.dmg](https://github.com/davidninow/microsoft-backup-suite/releases/download/v2.0.0/OneDrive.Backup.Manager-2.0.0-arm64.dmg) | 100 MB |
+| **Windows** | [OneDrive-Backup-Setup-2.0.0.exe](https://github.com/davidninow/microsoft-backup-suite/releases/download/v2.0.0/OneDrive.Backup.Manager.Setup.2.0.0.exe) | 80 MB |
+| **Linux** | [OneDrive.Backup.Manager-2.0.0.AppImage](https://github.com/davidninow/microsoft-backup-suite/releases/download/v2.0.0/OneDrive.Backup.Manager-2.0.0.AppImage) | 70 MB |
 
 *Download links will be added in the v2.0.0 release*
 
@@ -205,9 +205,6 @@ Moving to a new account or leaving Microsoft ecosystem:
 - 45,749 files succeeded (99.978%)
 - 10 files failed (0.022% - network issues)
 - After one retry: 45,796/45,796 (100%) ✨
-
-**User testimonial:**
-> "v1 found 32,857 files and downloaded 109. v2 found 45,796 files and downloaded 45,749. After one retry, got all 45,796 files. This is incredible!" - @davidninow
 
 ---
 
@@ -413,7 +410,7 @@ See [LICENSE.md](LICENSE.md) for details.
 
 - **Microsoft Graph API** - For providing access to personal data
 - **Open source community** - For libraries and inspiration
-- **@davidninow** - For extensive v2.0 testing (450GB, 45,796 files!)
+- **@davidninow** - For driving the project and extensive v2.0 testing (450GB, 45,796 files!)
 - **Contributors** - For bug reports and improvements
 
 ---
@@ -440,7 +437,7 @@ If these tools help you:
 ## 🎯 Quick Links
 
 - [OneDrive Backup v2.0 README](onedrive-backup/README.md)
-- [OneDrive v2.0 CHANGELOG](onedrive-backup/CHANGELOG.md)
+- [OneDrive v2.0 CHANGELOG](https://github.com/davidninow/microsoft-backup-suite/blob/main/CHANGELOG.md)
 - [OneNote Exporter Quick Start](onenote-exporter/QUICKSTART.md)
 - [OneNote Migration Guide](onenote-exporter/MIGRATION_GUIDE.md)
 - [Contributing Guidelines](CONTRIBUTING.md)
@@ -487,4 +484,4 @@ cd ../onenote-exporter && python3 onenote_exporter.py
 - **42,000% improvement in success rate** (0.3% → 99.978%)
 - **39% more files discovered** (32,857 → 45,796 files found)
 
-[Read the full CHANGELOG](onedrive-backup/CHANGELOG.md)
+[Read the full CHANGELOG](https://github.com/davidninow/microsoft-backup-suite/blob/main/CHANGELOG.md)
