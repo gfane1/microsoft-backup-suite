@@ -7,6 +7,16 @@
 Breaking free from Microsoft is hard. MSFT does everything they can to lock you in. This Backup Tool is for OneDrive users with a lot of data on OneDrive, who want an easy way to download/export all that data at once but don't have space on their local machine to do so.  
   
 This privacy-first Python script will automatically backup your entire OneDrive (for personal accounts) to an external hard drive of your choice, and preserve your exact OneDrive folder structure.
+   
+## What's New in v2.0
+ ✅ No more 200-file limit - Downloads ALL files  
+ ✅ Token auto-refresh - Zero HTTP 401 errors  
+ ✅ 40GB+ file support - Handles huge files  
+ ✅ Failed files report - See exactly what failed  
+ ✅ Interactive retry - Retry without exiting  
+ ✅ Desktop app - GUI interface  
+   
+   [See full CHANGELOG](CHANGELOG.md) | [Detailed fixes](docs/)
 
 ## Features
 
