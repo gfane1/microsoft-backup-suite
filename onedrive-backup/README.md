@@ -17,7 +17,7 @@ This privacy-first Python script will automatically backup your entire OneDrive 
  ✅ Interactive retry - Retry without exiting  
  ✅ Desktop app - GUI interface  
    
-   [See full CHANGELOG](CHANGELOG.md) | [Detailed fixes](docs/)
+   [See full CHANGELOG]([CHANGELOG.md](https://github.com/davidninow/microsoft-backup-suite/blob/main/onedrive-backup/README.md#:~:text=.gitignore-,CHANGELOG,-.md)) | [Detailed fixes](/docs)
 
 ## Features
 
