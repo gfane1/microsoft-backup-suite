@@ -93,7 +93,7 @@ python3 onedrive_backup_enhanced.py
 
 Follow prompts → Authenticate → Select drive → Choose files → Done!
 
-**📖 Full documentation:** See `onedrive-backup/README.md`
+**📖 Full documentation:** See [`onedrive-backup/README.md`](https://github.com/davidninow/microsoft-backup-suite/blob/main/onedrive-backup/README.md)
 
 ### OneNote Export
 
@@ -104,7 +104,7 @@ python3 onenote_exporter.py
 
 Follow prompts → Authenticate → Choose folder → Select format → Done!
 
-**📖 Full documentation:** See `onenote-exporter/README.md`
+**📖 Full documentation:** See [`onenote-exporter/README.md`](https://github.com/davidninow/microsoft-backup-suite/blob/main/onenote-exporter/README_ONENOTE.md)
 
 ---
 
@@ -151,8 +151,8 @@ Both tools require Azure app registrations with different permissions. You'll ne
 - `offline_access` (Delegated)
 
 **📖 Detailed setup instructions:**
-- OneDrive: See `onedrive-backup/README.md`
-- OneNote: See `onenote-exporter/QUICKSTART.md`
+- OneDrive: See [`onedrive-backup/README.md`](https://github.com/davidninow/microsoft-backup-suite/blob/main/onedrive-backup/README.md)
+- OneNote: See [`onenote-exporter/README.md`](https://github.com/davidninow/microsoft-backup-suite/blob/main/onenote-exporter/README_ONENOTE.md)
 
 ---
 
@@ -323,8 +323,8 @@ pip3 install requests
 - Try re-authenticating
 
 **For detailed troubleshooting:**
-- OneDrive: See `onedrive-backup/README.md`
-- OneNote: See `onenote-exporter/README_ONENOTE.md`
+- OneDrive: See [`onedrive-backup/README.md`](https://github.com/davidninow/microsoft-backup-suite/blob/main/onedrive-backup/README.md)
+- OneNote: See [`onenote-exporter/README.md`](https://github.com/davidninow/microsoft-backup-suite/blob/main/onenote-exporter/README_ONENOTE.md)
 
 ---
 
