@@ -17,7 +17,7 @@ This privacy-first Python script will automatically backup your entire OneDrive 
  ✅ Interactive retry - Retry without exiting  
  ✅ Desktop app - GUI interface  
    
-   [See full CHANGELOG]([CHANGELOG.md](https://github.com/davidninow/microsoft-backup-suite/blob/main/onedrive-backup/README.md#:~:text=.gitignore-,CHANGELOG,-.md)) | [Detailed fixes](/docs)
+   See full [CHANGELOG](https://github.com/davidninow/microsoft-backup-suite/blob/main/CHANGELOG.md) | [Detailed fixes](/docs)
 
 ## Features
 
@@ -45,8 +45,8 @@ This privacy-first Python script will automatically backup your entire OneDrive 
 
 1. Clone this repository:
 ```bash
-git clone https://github.com/davidninow/onedrive_backup_tool.git
-cd onedrive_backup_tool
+git clone https://github.com/davidninow/microsoft-backup-suite.git
+cd microsoft-backup-suite
 ```
 
 2. Install required dependencies:
@@ -121,7 +121,7 @@ You should see green checkmarks next to all permissions.
 
 Run the script:
 ```bash
-python3 onedrive_backup.py
+python3 onedrive_backup_enhanced.py
 ```
 
 Follow the prompts:
