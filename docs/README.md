@@ -12,7 +12,3 @@
    ## New Features
    - [Failed Files Report](FAILED_FILES_WITH_PATHS.md)
    - [Interactive Retry](INTERACTIVE_RETRY_FEATURE.md)
-
-   ## Guides
-   - [GitHub Integration](GITHUB_INTEGRATION_GUIDE.md)
-   - [Distribution Guide](ELECTRON_DISTRIBUTION_GUIDE.md)
