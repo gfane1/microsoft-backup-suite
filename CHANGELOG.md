@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0] - 2025-12-09
+## [2.0.0](https://github.com/davidninow/microsoft-backup-suite/releases/tag/v2.0.0) - 2025-12-09
 
 ### 🎉 Major Release - Complete Overhaul
 
@@ -213,6 +213,7 @@ Improvement: 42,000% increase in success rate!
 ### Credits
 
 **Special thanks to @davidninow for:**
+- Driving the project
 - Discovering the critical 200-file pagination bug
 - Extensive testing with 450GB of data
 - Detailed bug reports with screenshots
@@ -229,7 +230,7 @@ If you find any bugs, please [open an issue](https://github.com/davidninow/micro
 
 ---
 
-## [1.0.0] - 2025-12-04
+## 1.0.0 - 2025-12-04
 
 ### Initial Release
 
@@ -253,5 +254,5 @@ If you find any bugs, please [open an issue](https://github.com/davidninow/micro
 
 ---
 
-[2.0.0]: https://github.com/yourusername/onedrive-backup/compare/v1.0.0...v2.0.0
-[1.0.0]: https://github.com/yourusername/onedrive-backup/releases/tag/v1.0.0
+[2.0.0]: https://github.com/davidninow/microsoft-backup-suite/compare/v1.0.0...v2.0.0
+[1.0.0]: https://github.com/davidninow/microsoft-backup-suite/releases/tag/v1.0.0
