@@ -20,7 +20,7 @@ See full [CHANGELOG](https://github.com/davidninow/microsoft-backup-suite/blob/m
 
 ## 🎯 What's Included
 
-### 📁 OneDrive Backup Tool v2.0
+### 📁 [OneDrive Backup Tool v2.0](https://github.com/davidninow/microsoft-backup-suite/blob/main/onedrive-backup/README.md)
 Automatically backup your entire OneDrive (personal accounts) to an external drive, preserving the exact folder structure.
 
 **Key Features:**
@@ -35,7 +35,7 @@ Automatically backup your entire OneDrive (personal accounts) to an external dri
 - ✅ Resume capability - Stop/start anytime
 - ✅ Desktop app - GUI interface available
 
-### 📓 OneNote Exporter
+### 📓 OneNote Exporter (WIP)
 Export your entire OneNote notebooks with all attachments (images, audio recordings, PDFs, web links) for importing into popular note-taking apps.
 
 **Features:**
