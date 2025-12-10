@@ -56,7 +56,8 @@ Export your entire OneNote notebooks with all attachments (images, audio recordi
 
 | Platform | Download | Size |
 |----------|----------|------|
-| **macOS** | [OneDrive-Backup-2.0.0.dmg](https://github.com/davidninow/microsoft-backup-suite/releases/download/v2.0.0/OneDrive.Backup.Manager-2.0.0-arm64.dmg) | 100 MB |
+| **macOS (Apple Silicon)** | [OneDrive-Backup-2.0.0-arm64.dmg](https://github.com/davidninow/microsoft-backup-suite/releases/download/v2.0.0/OneDrive.Backup.Manager-2.0.0-arm64.dmg) | 100 MB 
+| **macOS (Intel)** | [OneDrive-Backup-2.0.0.dmg](https://github.com/davidninow/microsoft-backup-suite/releases/download/v2.0.0/OneDrive.Backup.Manager-2.0.0.dmg) | 96 MB |
 | **Windows** | [OneDrive-Backup-Setup-2.0.0.exe](https://github.com/davidninow/microsoft-backup-suite/releases/download/v2.0.0/OneDrive.Backup.Manager.Setup.2.0.0.exe) | 80 MB |
 | **Linux** | [OneDrive.Backup.Manager-2.0.0.AppImage](https://github.com/davidninow/microsoft-backup-suite/releases/download/v2.0.0/OneDrive.Backup.Manager-2.0.0.AppImage) | 70 MB |
 
