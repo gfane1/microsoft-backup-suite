@@ -2,7 +2,8 @@
 
 ![Python](https://img.shields.io/badge/python-3.6+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Status](https://img.shields.io/badge/status-active-success.svg)  
+![Status](https://img.shields.io/badge/status-active-success.svg)
+![GitHub release](https://img.shields.io/github/v/release/davidninow/microsoft-backup-suite) ![GitHub downloads](https://img.shields.io/github/downloads/davidninow/microsoft-backup-suite/total)  
 
 Breaking free from Microsoft is hard. MSFT does everything they can to lock you in. This Backup Tool is for OneDrive users with a lot of data on OneDrive, who want an easy way to download/export all that data at once but don't have space on their local machine to do so.  
   
