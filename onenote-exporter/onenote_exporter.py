@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-OneNote Export Tool v3.0
+OneNote Export Tool v3.1
 Exports OneNote notebooks with all attachments for import into Evernote, Joplin, etc.
 
 Features:
@@ -9,7 +9,9 @@ Features:
 - Robust retry with exponential backoff for 429/503/504/5xx
 - File logging for diagnostics
 - Page hierarchy support (parent/child pages)
-- Preflight inventory with index.md
+- Navigable index.md with clickable links
+- Hierarchical folder structure for parent/child pages
+- Orphan detection and handling
 - Settings file support (client_secret never stored)
 """
 
@@ -35,7 +37,7 @@ import mimetypes
 # ============================================================================
 # Constants
 # ============================================================================
-VERSION = "3.0.0"
+VERSION = "3.2.0"
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 DEFAULT_MAX_RETRIES = 10
 DEFAULT_TIMEOUT = 60
@@ -333,6 +335,7 @@ class OneNoteExporter:
         self.preflight_errors = []
         self.export_errors = []
         self.skipped_items = []
+        self.index_result = None  # Result from index_builder
         
         self.stats = {
             'notebooks': 0,
@@ -342,7 +345,8 @@ class OneNoteExporter:
             'child_pages': 0,
             'attachments': 0,
             'images': 0,
-            'errors': 0
+            'errors': 0,
+            'orphans': 0
         }
         
         # Load settings
@@ -745,6 +749,12 @@ class OneNoteExporter:
         # Build page hierarchy
         page_list = []
         child_count = 0
+        
+        # Debug: log level values for first section with pages
+        if pages:
+            level_values = [p.get('level', 'NOT_PRESENT') for p in pages[:5]]
+            logger.debug(f"Level values from API for '{sec_name}': {level_values}")
+        
         for p in pages:
             level = p.get('level', 0)
             if level > 0:
@@ -829,14 +839,58 @@ class OneNoteExporter:
         return count
     
     # =========================================================================
-    # Index File Generation
+    # Index File Generation (using index_builder module)
     # =========================================================================
     
     def write_index_files(self, output_path: Path):
-        """Write index.md and index.json before export."""
+        """Write navigable index.md and index.json using index_builder module."""
         if not self.preflight_data:
-            return
+            return None
         
+        try:
+            from index_builder import (
+                build_index, 
+                write_index_files as write_idx, 
+                execute_filesystem_ops
+            )
+            
+            # Build the index with hierarchy resolution
+            result = build_index(
+                output_path,
+                self.preflight_data,
+                self.user_info,
+                self.graph.tenant_id,
+                self.preflight_data.get('scope', 'Unknown')
+            )
+            
+            # Store the result for later use in export
+            self.index_result = result
+            
+            # Execute filesystem operations (create folders)
+            execute_filesystem_ops(result.filesystem_ops)
+            
+            # Write the index files
+            md_path, json_path = write_idx(output_path, result)
+            
+            logger.info(f"✓ Wrote {md_path} (navigable with {result.stats['pages']} pages)")
+            logger.info(f"✓ Wrote {json_path}")
+            
+            # Log hierarchy stats
+            if result.stats.get('orphans', 0) > 0:
+                logger.warning(f"   {result.stats['orphans']} orphaned pages detected")
+                self.stats['orphans'] = result.stats['orphans']
+            if result.stats.get('parent_pages', 0) > 0:
+                logger.info(f"   {result.stats['parent_pages']} parent pages with {result.stats['child_pages']} children")
+            
+            return result
+            
+        except ImportError:
+            # Fallback to legacy generation if index_builder not available
+            logger.warning("index_builder module not found, using legacy index generation")
+            return self._write_legacy_index_files(output_path)
+    
+    def _write_legacy_index_files(self, output_path: Path):
+        """Legacy index generation (fallback)."""
         # Write JSON
         json_path = output_path / 'index.json'
         save_json(json_path, self.preflight_data)
@@ -848,6 +902,7 @@ class OneNoteExporter:
         with open(md_path, 'w', encoding='utf-8') as f:
             f.write(md_content)
         logger.info(f"✓ Wrote {md_path}")
+        return None
     
     def _generate_index_markdown(self) -> str:
         """Generate index.md content."""
@@ -960,10 +1015,39 @@ class OneNoteExporter:
         for nb_idx, nb_data in enumerate(notebooks, 1):
             self._export_notebook(nb_data, nb_idx, total_notebooks)
         
+        # Validate index links AFTER export completes
+        self._validate_index_links()
+        
         # Save summary
         self._save_export_summary()
         
         return True
+    
+    def _validate_index_links(self):
+        """Validate that index.md links point to files that exist after export."""
+        if not self.index_result:
+            return
+        
+        try:
+            from index_builder import validate_index_links
+            
+            print("\n" + "=" * 70)
+            print("🔍 VALIDATING INDEX LINKS")
+            print("=" * 70)
+            
+            missing_links = validate_index_links(self.export_root, self.index_result)
+            
+            if missing_links:
+                logger.warning(f"⚠️ {len(missing_links)} link targets missing after export:")
+                for link in missing_links[:10]:
+                    logger.warning(f"   Missing: {link.get('relative_target')} ({link.get('context')})")
+                if len(missing_links) > 10:
+                    logger.warning(f"   ... and {len(missing_links) - 10} more")
+            else:
+                logger.info("✓ All index links verified - files exist on disk")
+                
+        except ImportError:
+            pass  # index_builder not available
     
     def _export_notebook(self, nb_data: Dict, nb_idx: int, total: int):
         """Export a notebook with progress output."""
@@ -1098,25 +1182,26 @@ class OneNoteExporter:
             
             content = response.text
             
-            # Save HTML
-            with open(html_path, 'w', encoding='utf-8') as f:
-                f.write(content)
+            # Extract attachments and get updated content with local image paths
+            attachments, updated_content = self._extract_attachments(content, html_path)
             
-            # Extract attachments
-            attachments = self._extract_attachments(content, html_path)
+            # Save HTML with local image paths
+            with open(html_path, 'w', encoding='utf-8') as f:
+                f.write(updated_content)
             
             # Export to format
             metadata = {
                 'created': page_info.get('createdDateTime', ''),
                 'modified': page_info.get('lastModifiedDateTime', ''),
-                'level': level
+                'level': level,
+                'title': page_title
             }
             
             if self.export_format in ('joplin', 'both'):
-                self._export_joplin(page_folder, page_title, content, metadata)
+                self._export_joplin(page_folder, page_title, updated_content, metadata, attachments)
             
             if self.export_format in ('enex', 'both'):
-                self._export_enex(page_folder, page_title, content, attachments, metadata)
+                self._export_enex(page_folder, page_title, updated_content, attachments, metadata)
             
             self.stats['pages'] += 1
             
@@ -1135,46 +1220,83 @@ class OneNoteExporter:
             sys.stdout.write("\r" + " " * 80 + "\r")
             sys.stdout.flush()
     
-    def _extract_attachments(self, html_content: str, page_path: Path) -> List[str]:
-        """Extract and download attachments."""
+    def _extract_attachments(self, html_content: str, page_path: Path) -> Tuple[List[str], str]:
+        """
+        Extract and download attachments, returning updated HTML with local paths.
+        
+        Returns:
+            Tuple of (list of attachment filenames, updated HTML content)
+        """
         attachments = []
         attachments_dir = page_path.parent / f"{page_path.stem}_attachments"
+        updated_html = html_content
         
-        img_pattern = r'<img[^>]*src="([^"]+)"'
+        # Find all images
+        img_pattern = r'<img[^>]*src="([^"]+)"[^>]*>'
         img_count = 0
         
         for match in re.finditer(img_pattern, html_content):
+            full_tag = match.group(0)
             src = match.group(1)
             img_count += 1
             
+            filename = None
+            
             if src.startswith('data:'):
+                # Base64 encoded image
                 if not attachments_dir.exists():
                     attachments_dir.mkdir()
-                filename = f"image_{img_count}.png"
-                self._save_base64(src, attachments_dir / filename)
-                attachments.append(filename)
-                self.stats['images'] += 1
-            elif src.startswith('http'):
-                if not attachments_dir.exists():
-                    attachments_dir.mkdir()
-                ext = self._get_ext_from_url(src) or 'png'
+                
+                # Determine extension from mime type
+                mime_match = re.match(r'data:image/(\w+)', src)
+                ext = mime_match.group(1) if mime_match else 'png'
                 filename = f"image_{img_count}.{ext}"
+                
+                if self._save_base64(src, attachments_dir / filename):
+                    attachments.append(filename)
+                    self.stats['images'] += 1
+                    
+            elif src.startswith('http'):
+                # Remote URL (Graph API or external)
+                if not attachments_dir.exists():
+                    attachments_dir.mkdir()
+                
+                # Get extension from URL or data-src-type attribute
+                ext = self._get_ext_from_url(src)
+                if not ext:
+                    # Try to get from data-src-type attribute
+                    type_match = re.search(r'data-src-type="image/(\w+)"', full_tag)
+                    ext = type_match.group(1) if type_match else 'png'
+                
+                filename = f"image_{img_count}.{ext}"
+                
                 if self._download_file(src, attachments_dir / filename):
                     attachments.append(filename)
                     self.stats['images'] += 1
+                else:
+                    logger.debug(f"Failed to download image: {src[:100]}...")
+                    filename = None  # Keep original URL if download fails
+            
+            # Update HTML with local path
+            if filename:
+                local_path = f"{page_path.stem}_attachments/{filename}"
+                new_tag = re.sub(r'src="[^"]+"', f'src="{local_path}"', full_tag)
+                updated_html = updated_html.replace(full_tag, new_tag)
         
-        return attachments
+        return attachments, updated_html
     
-    def _save_base64(self, data_url: str, filepath: Path):
-        """Save base64 data."""
+    def _save_base64(self, data_url: str, filepath: Path) -> bool:
+        """Save base64 data. Returns True on success."""
         try:
             match = re.match(r'data:([^;]+);base64,(.+)', data_url)
             if match:
                 data = base64.b64decode(match.group(2))
                 with open(filepath, 'wb') as f:
                     f.write(data)
+                return True
         except Exception as e:
             logger.debug(f"Base64 save error: {e}")
+        return False
     
     def _download_file(self, url: str, filepath: Path) -> bool:
         """Download file."""
@@ -1191,31 +1313,114 @@ class OneNoteExporter:
         ext = Path(path).suffix
         return ext.lstrip('.') if ext else None
     
-    def _html_to_markdown(self, html_content: str) -> str:
-        """Convert HTML to Markdown."""
+    def _html_to_markdown(self, html_content: str, page_name: str = "") -> str:
+        """
+        Convert HTML to Markdown with proper image handling.
+        
+        Args:
+            html_content: The HTML content to convert
+            page_name: The page name (used for attachment folder reference)
+        """
         md = html_content
+        
+        # Convert images FIRST (before stripping other tags)
+        # Match: <img src="..." /> or <img src="...">
+        # Extract alt text if present: alt="description"
+        def replace_img(match):
+            full_tag = match.group(0)
+            src_match = re.search(r'src="([^"]+)"', full_tag)
+            alt_match = re.search(r'alt="([^"]*)"', full_tag)
+            
+            if src_match:
+                src = src_match.group(1)
+                alt = alt_match.group(1) if alt_match else "image"
+                return f'![{alt}]({src})'
+            return ''
+        
+        md = re.sub(r'<img[^>]*/?>', replace_img, md, flags=re.IGNORECASE)
+        
+        # Convert headers
         md = re.sub(r'<h1[^>]*>(.*?)</h1>', r'# \1\n', md, flags=re.DOTALL)
         md = re.sub(r'<h2[^>]*>(.*?)</h2>', r'## \1\n', md, flags=re.DOTALL)
         md = re.sub(r'<h3[^>]*>(.*?)</h3>', r'### \1\n', md, flags=re.DOTALL)
+        md = re.sub(r'<h4[^>]*>(.*?)</h4>', r'#### \1\n', md, flags=re.DOTALL)
+        
+        # Convert text formatting
         md = re.sub(r'<strong[^>]*>(.*?)</strong>', r'**\1**', md, flags=re.DOTALL)
+        md = re.sub(r'<b[^>]*>(.*?)</b>', r'**\1**', md, flags=re.DOTALL)
         md = re.sub(r'<em[^>]*>(.*?)</em>', r'*\1*', md, flags=re.DOTALL)
+        md = re.sub(r'<i[^>]*>(.*?)</i>', r'*\1*', md, flags=re.DOTALL)
+        md = re.sub(r'<u[^>]*>(.*?)</u>', r'<u>\1</u>', md, flags=re.DOTALL)
+        md = re.sub(r'<s[^>]*>(.*?)</s>', r'~~\1~~', md, flags=re.DOTALL)
+        md = re.sub(r'<strike[^>]*>(.*?)</strike>', r'~~\1~~', md, flags=re.DOTALL)
+        
+        # Convert links
         md = re.sub(r'<a[^>]*href="([^"]+)"[^>]*>(.*?)</a>', r'[\2](\1)', md, flags=re.DOTALL)
+        
+        # Convert lists
+        md = re.sub(r'<li[^>]*>(.*?)</li>', r'- \1\n', md, flags=re.DOTALL)
+        md = re.sub(r'<[ou]l[^>]*>', '', md)
+        md = re.sub(r'</[ou]l>', '\n', md)
+        
+        # Convert line breaks and paragraphs
+        md = re.sub(r'<br\s*/?>', '\n', md, flags=re.IGNORECASE)
+        md = re.sub(r'<p[^>]*>(.*?)</p>', r'\1\n\n', md, flags=re.DOTALL)
+        md = re.sub(r'<div[^>]*>(.*?)</div>', r'\1\n', md, flags=re.DOTALL)
+        
+        # Convert code/pre blocks
+        md = re.sub(r'<pre[^>]*>(.*?)</pre>', r'```\n\1\n```\n', md, flags=re.DOTALL)
+        md = re.sub(r'<code[^>]*>(.*?)</code>', r'`\1`', md, flags=re.DOTALL)
+        
+        # Convert blockquotes
+        md = re.sub(r'<blockquote[^>]*>(.*?)</blockquote>', r'> \1\n', md, flags=re.DOTALL)
+        
+        # Convert horizontal rules
+        md = re.sub(r'<hr[^>]*/?>', '\n---\n', md, flags=re.IGNORECASE)
+        
+        # Strip remaining HTML tags (must be last)
         md = re.sub(r'<[^>]+>', '', md)
+        
+        # Clean up whitespace
         md = re.sub(r'\n\s*\n\s*\n', '\n\n', md)
+        md = re.sub(r'[ \t]+\n', '\n', md)  # Trailing whitespace
+        
         return html.unescape(md).strip()
     
-    def _export_joplin(self, folder: Path, title: str, content: str, metadata: Dict):
-        """Export as Joplin Markdown."""
-        joplin_dir = folder / 'joplin' if folder.name != self.sanitize_filename(title) else folder
-        joplin_dir.mkdir(exist_ok=True)
+    def _export_joplin(self, folder: Path, title: str, content: str, 
+                       metadata: Dict, attachments: List[str] = None):
+        """
+        Export as Joplin/Obsidian compatible Markdown with YAML front matter.
         
-        md_content = self._html_to_markdown(content)
-        filepath = joplin_dir / f"{self.sanitize_filename(title)}.md"
+        Creates a .md file with:
+        - YAML front matter (title, created, modified dates)
+        - Properly converted markdown content
+        - Relative image paths that work in note apps
+        """
+        attachments = attachments or []
+        safe_title = self.sanitize_filename(title)
+        
+        # Put markdown files alongside HTML (not in subfolder)
+        # This makes it easier for note apps to import
+        filepath = folder / f"{safe_title}.md"
+        
+        md_content = self._html_to_markdown(content, safe_title)
+        
+        # Format dates for YAML (ISO 8601 format works best)
+        created = metadata.get('created', '')
+        modified = metadata.get('modified', '')
+        
+        # Build YAML front matter (compatible with Obsidian, Joplin, etc.)
+        front_matter = f"""---
+title: "{title.replace('"', '\\"')}"
+created: {created}
+modified: {modified}
+tags: [onenote-export]
+---
+
+"""
         
         with open(filepath, 'w', encoding='utf-8') as f:
-            f.write(f"# {title}\n\n")
-            f.write(f"Created: {metadata['created']}\n")
-            f.write(f"Modified: {metadata['modified']}\n\n")
+            f.write(front_matter)
             f.write(md_content)
     
     def _export_enex(self, folder: Path, title: str, content: str, 

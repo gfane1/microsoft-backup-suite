@@ -1,18 +1,20 @@
-# OneNote to Evernote/Joplin Exporter v2.0
+# OneNote Exporter v3.2
 
-A Python tool to export your entire OneNote notebooks with all attachments (images, audio recordings, PDFs, web links, etc.) for importing into popular note-taking apps like Evernote and Joplin.
+A Python tool to export your entire OneNote notebooks with all attachments (images, audio recordings, PDFs, web links, etc.) for importing into popular note-taking apps like **Joplin**, **Obsidian**, **Evernote**, and **Notion**.
 
-## 🆕 What's New in v2.0
+## 🆕 What's New in v3.2
 
-- ✅ **Full Pagination** - Correctly follows `@odata.nextLink` to get ALL notebooks, sections, and pages
-- ✅ **Section Groups** - Now exports content from nested section groups
-- ✅ **Preflight Inventory** - Generates `index.md` and `index.json` before export to show what Graph API can see
-- ✅ **Settings File** - Configure `client_id`, `tenant`, and export options in `settings.json`
-- ✅ **Progress Reporting** - Clear progress output during export
-- ✅ **Exit Summary** - Compares preflight totals to export totals and waits for user input
-- ✅ **Robust Retry** - Exponential backoff for 429/5xx errors with `Retry-After` support
-- ✅ **`--preflight-only`** - Scan and generate index files without exporting
-- ✅ **`--no-pause`** - Exit immediately for scripted/scheduled runs
+- ✅ **Joplin/Obsidian Compatible Markdown** - YAML front matter with proper metadata
+- ✅ **Fixed Image Export** - Images now display correctly with local file paths
+- ✅ **Improved HTML→Markdown** - Better conversion of images, lists, code blocks, formatting
+- ✅ **Parent/Child Page Support** - Preserves page hierarchy from OneNote
+- ✅ **Navigable Index** - Clickable `index.md` with full notebook structure
+- ✅ **81 Unit Tests** - Comprehensive test coverage for reliability
+- ✅ **Index Builder Module** - Modular, testable code architecture
+
+### Previous Versions
+- **v3.0**: Full pagination, preflight inventory, interactive selection, robust retry
+- **v2.0**: Section groups, settings file, progress reporting
 
 ## ✨ Features
 

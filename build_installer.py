@@ -9,6 +9,11 @@ import os
 import shutil
 from pathlib import Path
 
+# Fix console encoding for Windows
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 def build_executable(script_path, name, icon=None):
     """Build a single executable"""
     print(f"\n{'='*60}")
