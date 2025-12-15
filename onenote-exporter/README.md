@@ -1,10 +1,24 @@
-# OneNote to Evernote/Joplin Exporter
+# OneNote to Evernote/Joplin Exporter v2.0
 
 A Python tool to export your entire OneNote notebooks with all attachments (images, audio recordings, PDFs, web links, etc.) for importing into popular note-taking apps like Evernote and Joplin.
 
+## 🆕 What's New in v2.0
+
+- ✅ **Full Pagination** - Correctly follows `@odata.nextLink` to get ALL notebooks, sections, and pages
+- ✅ **Section Groups** - Now exports content from nested section groups
+- ✅ **Preflight Inventory** - Generates `index.md` and `index.json` before export to show what Graph API can see
+- ✅ **Settings File** - Configure `client_id`, `tenant`, and export options in `settings.json`
+- ✅ **Progress Reporting** - Clear progress output during export
+- ✅ **Exit Summary** - Compares preflight totals to export totals and waits for user input
+- ✅ **Robust Retry** - Exponential backoff for 429/5xx errors with `Retry-After` support
+- ✅ **`--preflight-only`** - Scan and generate index files without exporting
+- ✅ **`--no-pause`** - Exit immediately for scripted/scheduled runs
+
 ## ✨ Features
 
-- **Complete Export**: Exports all notebooks, sections, and pages from OneNote
+- **Complete Export**: Exports all notebooks, section groups, sections, and pages from OneNote
+- **Full Pagination**: Correctly handles Microsoft Graph API pagination (no more missing pages!)
+- **Preflight Scan**: Generates inventory before export to verify what Graph can see
 - **Preserves Attachments**: Downloads all embedded files:
   - 🖼️ Images (PNG, JPG, etc.)
   - 🎵 Audio recordings (M4A, WAV, etc.)
@@ -14,9 +28,10 @@ A Python tool to export your entire OneNote notebooks with all attachments (imag
   - Markdown (for Joplin)
   - ENEX (for Evernote)
   - HTML (universal format)
-- **Preserves Structure**: Maintains your notebook → section → page hierarchy
+- **Preserves Structure**: Maintains your notebook → section group → section → page hierarchy
 - **Metadata Preservation**: Keeps creation dates, modification dates, and authors
-- **Resume Support**: Can handle large exports with token refresh
+- **Settings File**: Configure defaults in `settings.json` (client_id, output path, format)
+- **Resume Support**: Can handle large exports with automatic token refresh
 
 ## 📋 Requirements
 
@@ -84,7 +99,70 @@ You should see green checkmarks next to all permissions.
 
 ## 📖 Usage
 
-### Basic Usage
+### Quick Start with Settings File
+
+1. **Copy the example settings file:**
+```bash
+cp settings.example.json settings.json
+```
+
+2. **Edit `settings.json` with your Client ID:**
+```json
+{
+  "auth": {
+    "client_id": "YOUR_CLIENT_ID_HERE",
+    "tenant": "consumers"
+  },
+  "export": {
+    "output_root": "C:/OneNote-Exports",
+    "format": "joplin",
+    "include_notebooks": [],
+    "exclude_notebooks": []
+  }
+}
+```
+
+> **⚠️ Security Note:** The `client_secret` is NEVER stored in settings.json. You will always be prompted to enter it at runtime.
+
+3. **Run the exporter:**
+```bash
+python onenote_exporter.py
+```
+
+### Command Line Options
+
+```bash
+# Basic usage
+python onenote_exporter.py
+
+# Preflight only - scan and generate index files without exporting
+python onenote_exporter.py --preflight-only
+
+# Override output directory
+python onenote_exporter.py --output "D:/Backups/OneNote"
+
+# No pause at end (for scripted runs)
+python onenote_exporter.py --no-pause
+
+# Use a different settings file
+python onenote_exporter.py --settings my_settings.json
+
+# Combine options
+python onenote_exporter.py --preflight-only --output "C:/Temp" --no-pause
+```
+
+### Settings File Options
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| `auth.client_id` | Azure App Client ID | *(prompt)* |
+| `auth.tenant` | Azure tenant (`consumers` for personal) | `consumers` |
+| `export.output_root` | Export destination path | *(prompt)* |
+| `export.format` | `joplin`, `enex`, `both`, or `raw_html` | `joplin` |
+| `export.include_notebooks` | Only export these notebooks (empty = all) | `[]` |
+| `export.exclude_notebooks` | Skip these notebooks | `[]` |
+
+### Basic Usage (No Settings File)
 
 1. **Run the script:**
 ```bash
@@ -93,35 +171,52 @@ python3 onenote_exporter.py
 
 2. **Follow the prompts:**
    - Enter your **Application (client) ID**
-   - Enter your **Client Secret**
-   - Enter `common` for Tenant ID (for personal accounts)
+   - Enter your **Client Secret** (always prompted, hidden input)
+   - Enter `consumers` for Tenant ID (for personal accounts)
    - Browser opens → sign in and approve permissions
    - Copy the redirect URL from browser and paste into terminal
-   - Enter destination path (e.g., `/Users/yourname/Desktop`)
+   - Enter destination path (e.g., `C:/OneNote-Exports`)
    - Choose export format
 
 3. **Wait for completion:**
-   - The script will export all notebooks
-   - Progress is shown in real-time
-   - Large notebooks may take several minutes
+   - Preflight scan shows all notebooks/sections/pages found
+   - Export proceeds with progress output
+   - Final summary compares preflight totals to exported totals
+   - Press Enter to exit (or use `--no-pause`)
+
+### Preflight Only Mode
+
+To see what Microsoft Graph can access without exporting:
+
+```bash
+python onenote_exporter.py --preflight-only --output "C:/Temp"
+```
+
+This generates:
+- `index.md` - Human-readable inventory
+- `index.json` - Machine-readable inventory
+
+Compare these totals with your OneNote desktop app to verify Graph API access.
 
 ### Export Format Options
 
 When running the script, you can choose:
 
-1. **Both formats** (default) - Creates Markdown and ENEX files
-2. **Joplin only** - Only Markdown files
-3. **Evernote only** - Only ENEX files
-4. **HTML only** - Raw HTML files (no conversion)
+1. **Joplin** (default) - Markdown files
+2. **ENEX** - Evernote export files
+3. **Both** - Creates Markdown and ENEX files
+4. **Raw HTML** - Only raw HTML files (no conversion)
 
 ## 📁 Output Structure
 
 Your export will be organized as follows:
 
 ```
-OneNote_Export_20241203_143052/
-├── README.md                          # Import instructions
+OneNote_Export_20241215_143052/
+├── index.md                           # Preflight inventory (human-readable)
+├── index.json                         # Preflight inventory (machine-readable)
 ├── export_summary.json                # Export statistics
+├── error_log.json                     # Errors if any occurred
 │
 ├── Personal Notebook/
 │   ├── Quick Notes/
@@ -130,15 +225,14 @@ OneNote_Export_20241203_143052/
 │   │   │   ├── image_1.png
 │   │   │   ├── audio_1.m4a
 │   │   │   └── document.pdf
-│   │   └── ...
+│   │   ├── joplin/                    # Markdown files for Joplin
+│   │   │   └── meeting_notes.md
+│   │   └── evernote/                  # ENEX files for Evernote
+│   │       └── meeting_notes.enex
 │   │
-│   ├── joplin/                        # Markdown files for Joplin
-│   │   ├── meeting_notes.md
-│   │   └── ...
-│   │
-│   └── evernote/                      # ENEX files for Evernote
-│       ├── meeting_notes.enex
-│       └── ...
+│   └── Section Group Name/            # Section groups preserved!
+│       └── Nested Section/
+│           └── ...
 │
 ├── Work Notebook/
 │   └── ... (same structure)
@@ -319,12 +413,48 @@ MIT License - see LICENSE file for details
 Future improvements:
 - [ ] Selective export (specific notebooks/sections)
 - [ ] Incremental export (only new/modified pages)
-- [ ] Better Markdown conversion (using html2text)
+- [ ] Better Markdown conversion (using Pandoc - see `README_PANDOC_CLEANUP.md`)
 - [ ] Direct import to Joplin/Evernote APIs
 - [ ] GUI interface for easier use
 - [ ] Progress bar with ETA
 - [ ] Parallel downloads for speed
 - [ ] OCR for handwritten notes
+
+## 🧪 Testing
+
+Run the unit tests:
+
+```bash
+cd onenote-exporter
+python -m pytest test_onenote_exporter.py -v
+```
+
+Or with unittest:
+
+```bash
+python -m unittest test_onenote_exporter -v
+```
+
+### Manual Test Plan
+
+1. **Preflight Only Test:**
+   ```bash
+   python onenote_exporter.py --preflight-only --output ./test_output
+   ```
+   - Verify `index.md` lists all expected notebooks
+   - Compare page counts to OneNote desktop app
+
+2. **Full Export Test:**
+   ```bash
+   python onenote_exporter.py --output ./test_output
+   ```
+   - Verify final summary shows matching preflight/export totals
+   - Spot-check exported pages match originals
+
+3. **Settings File Test:**
+   - Create `settings.json` with your `client_id`
+   - Run without any arguments
+   - Verify client_id is loaded but secret is still prompted
 
 ## 💡 Tips
 

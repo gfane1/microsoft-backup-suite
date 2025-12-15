@@ -1,79 +1,418 @@
 #!/usr/bin/env python3
 """
-OneNote Export Tool
+OneNote Export Tool v3.0
 Exports OneNote notebooks with all attachments for import into Evernote, Joplin, etc.
+
+Features:
+- Interactive notebook/section selection
+- Full pagination with @odata.nextLink support
+- Robust retry with exponential backoff for 429/503/504/5xx
+- File logging for diagnostics
+- Page hierarchy support (parent/child pages)
+- Preflight inventory with index.md
+- Settings file support (client_secret never stored)
 """
 
 import os
+import sys
 import json
+import argparse
 import requests
 import webbrowser
 import getpass
+import time
+import random
+import logging
 from pathlib import Path
 from datetime import datetime
 from urllib.parse import urlparse, parse_qs
 import base64
 import html
 import re
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Any, Tuple
 import mimetypes
 
-class OneNoteExporter:
-    def __init__(self):
+# ============================================================================
+# Constants
+# ============================================================================
+VERSION = "3.0.0"
+GRAPH_BASE = "https://graph.microsoft.com/v1.0"
+DEFAULT_MAX_RETRIES = 10
+DEFAULT_TIMEOUT = 60
+
+
+# ============================================================================
+# Logging Setup
+# ============================================================================
+class FileAndConsoleLogger:
+    """Dual logger: detailed file logging + clean console output."""
+    
+    def __init__(self, log_path: Path = None):
+        self.log_path = log_path
+        self.file_handler = None
+        self.console_logger = logging.getLogger('console')
+        self.file_logger = logging.getLogger('file')
+        
+        # Console: INFO level, clean format
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(logging.INFO)
+        console_handler.setFormatter(logging.Formatter('%(message)s'))
+        self.console_logger.addHandler(console_handler)
+        self.console_logger.setLevel(logging.INFO)
+        
+    def set_log_file(self, log_path: Path):
+        """Set up file logging."""
+        self.log_path = log_path
+        file_handler = logging.FileHandler(log_path, encoding='utf-8')
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(logging.Formatter(
+            '%(asctime)s | %(levelname)s | %(message)s'
+        ))
+        self.file_logger.addHandler(file_handler)
+        self.file_logger.setLevel(logging.DEBUG)
+        
+    def info(self, msg: str):
+        self.console_logger.info(msg)
+        if self.log_path:
+            self.file_logger.info(msg)
+            
+    def debug(self, msg: str):
+        if self.log_path:
+            self.file_logger.debug(msg)
+            
+    def warning(self, msg: str):
+        self.console_logger.warning(f"⚠️  {msg}")
+        if self.log_path:
+            self.file_logger.warning(msg)
+            
+    def error(self, msg: str):
+        self.console_logger.error(f"❌ {msg}")
+        if self.log_path:
+            self.file_logger.error(msg)
+            
+    def api_error(self, method: str, url: str, status: int, context: str, 
+                  attempt: int, error_msg: str = None):
+        """Log API error with full details to file."""
+        # Redact tokens from URL
+        safe_url = re.sub(r'access_token=[^&]+', 'access_token=REDACTED', url)
+        safe_url = re.sub(r'Bearer [^\s]+', 'Bearer REDACTED', safe_url)
+        
+        log_entry = (
+            f"API ERROR | {method} {safe_url} | "
+            f"Status: {status} | Context: {context} | "
+            f"Attempt: {attempt} | Error: {error_msg or 'N/A'}"
+        )
+        if self.log_path:
+            self.file_logger.error(log_entry)
+
+
+logger = FileAndConsoleLogger()
+
+
+# ============================================================================
+# Settings
+# ============================================================================
+def load_settings(settings_path: Path) -> Dict[str, Any]:
+    """Load settings from JSON file. Never loads client_secret."""
+    if not settings_path.exists():
+        return {}
+    try:
+        with open(settings_path, 'r', encoding='utf-8') as f:
+            settings = json.load(f)
+        # SECURITY: Never load client_secret from file
+        if 'auth' in settings and 'client_secret' in settings.get('auth', {}):
+            del settings['auth']['client_secret']
+        return settings
+    except Exception as e:
+        logger.warning(f"Could not load settings.json: {e}")
+        return {}
+
+
+def save_json(filepath: Path, data: Any, indent: int = 2):
+    """Save data to JSON file."""
+    with open(filepath, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=indent, ensure_ascii=False, default=str)
+
+
+# ============================================================================
+# Graph API Client with Robust Retry
+# ============================================================================
+class GraphClient:
+    """Microsoft Graph API client with robust retry logic."""
+    
+    def __init__(self, max_retries: int = DEFAULT_MAX_RETRIES):
         self.access_token = None
         self.refresh_token = None
         self.client_id = None
         self.client_secret = None
         self.tenant_id = None
+        self.max_retries = max_retries
+        self.request_count = 0
+        self.error_count = 0
+        
+    def make_request(self, url: str, context: str = "", method: str = 'GET',
+                     timeout: int = DEFAULT_TIMEOUT) -> Optional[requests.Response]:
+        """Make API request with retry logic for transient errors."""
+        headers = {'Authorization': f'Bearer {self.access_token}'}
+        
+        for attempt in range(1, self.max_retries + 1):
+            self.request_count += 1
+            
+            try:
+                logger.debug(f"Request {self.request_count}: {method} {url[:100]}...")
+                
+                if method == 'GET':
+                    response = requests.get(url, headers=headers, timeout=timeout)
+                else:
+                    response = requests.post(url, headers=headers, timeout=timeout)
+                
+                # Success
+                if response.status_code == 200:
+                    return response
+                
+                # Handle 401 - token expired
+                if response.status_code == 401 and self.refresh_token:
+                    logger.debug("Token expired, refreshing...")
+                    if self._refresh_access_token():
+                        headers['Authorization'] = f'Bearer {self.access_token}'
+                        continue
+                    else:
+                        logger.error("Token refresh failed")
+                        return None
+                
+                # Handle rate limiting (429)
+                if response.status_code == 429:
+                    retry_after = int(response.headers.get('Retry-After', 10))
+                    logger.warning(f"Rate limited (429), waiting {retry_after}s... [{context}]")
+                    logger.api_error(method, url, 429, context, attempt, "Rate limited")
+                    time.sleep(retry_after)
+                    continue
+                
+                # Handle server errors (5xx)
+                if response.status_code >= 500:
+                    wait_time = min(60, (2 ** attempt) + random.uniform(0, 2))
+                    error_snippet = response.text[:200] if response.text else "No response body"
+                    logger.warning(f"Server error {response.status_code}, retry {attempt}/{self.max_retries} in {wait_time:.1f}s [{context}]")
+                    logger.api_error(method, url, response.status_code, context, attempt, error_snippet)
+                    self.error_count += 1
+                    time.sleep(wait_time)
+                    continue
+                
+                # Other errors - log and return
+                logger.api_error(method, url, response.status_code, context, attempt, 
+                               response.text[:200] if response.text else None)
+                self.error_count += 1
+                return response
+                
+            except requests.exceptions.Timeout:
+                wait_time = min(60, (2 ** attempt) + random.uniform(0, 2))
+                logger.warning(f"Timeout, retry {attempt}/{self.max_retries} in {wait_time:.1f}s [{context}]")
+                logger.api_error(method, url, 0, context, attempt, "Timeout")
+                self.error_count += 1
+                time.sleep(wait_time)
+                
+            except requests.exceptions.ConnectionError as e:
+                wait_time = min(60, (2 ** attempt) + random.uniform(0, 2))
+                logger.warning(f"Connection error, retry {attempt}/{self.max_retries} [{context}]")
+                logger.api_error(method, url, 0, context, attempt, str(e))
+                self.error_count += 1
+                time.sleep(wait_time)
+                
+            except Exception as e:
+                logger.api_error(method, url, 0, context, attempt, str(e))
+                logger.error(f"Unexpected error: {e} [{context}]")
+                self.error_count += 1
+                if attempt == self.max_retries:
+                    return None
+                time.sleep(1)
+        
+        logger.error(f"Max retries ({self.max_retries}) exceeded [{context}]")
+        return None
+    
+    def _refresh_access_token(self) -> bool:
+        """Refresh the access token."""
+        if not self.refresh_token:
+            return False
+        
+        token_url = f"https://login.microsoftonline.com/{self.tenant_id}/oauth2/v2.0/token"
+        data = {
+            'client_id': self.client_id,
+            'client_secret': self.client_secret,
+            'refresh_token': self.refresh_token,
+            'grant_type': 'refresh_token'
+        }
+        
+        try:
+            response = requests.post(token_url, data=data, timeout=30)
+            result = response.json()
+            
+            if 'access_token' in result:
+                self.access_token = result['access_token']
+                self.refresh_token = result.get('refresh_token', self.refresh_token)
+                logger.info("✅ Token refreshed")
+                return True
+        except Exception as e:
+            logger.error(f"Token refresh error: {e}")
+        return False
+    
+    def get_all_pages(self, initial_url: str, context: str = "") -> Tuple[List[Dict], List[Dict]]:
+        """
+        Follow all @odata.nextLink pages and return (items, errors).
+        Returns tuple of (all_items, error_list) to track pagination failures.
+        """
+        all_items = []
+        errors = []
+        url = initial_url
+        page_num = 0
+        
+        while url:
+            page_num += 1
+            page_context = f"{context} [page {page_num}]"
+            
+            response = self.make_request(url, context=page_context)
+            
+            if not response:
+                errors.append({
+                    'url': url,
+                    'context': page_context,
+                    'page': page_num,
+                    'error': 'No response after retries'
+                })
+                break
+            
+            if response.status_code != 200:
+                errors.append({
+                    'url': url,
+                    'context': page_context,
+                    'page': page_num,
+                    'status': response.status_code,
+                    'error': response.text[:200] if response.text else 'Unknown'
+                })
+                break
+            
+            try:
+                data = response.json()
+            except Exception as e:
+                errors.append({
+                    'url': url,
+                    'context': page_context,
+                    'page': page_num,
+                    'error': f'JSON parse error: {e}'
+                })
+                break
+            
+            items = data.get('value', [])
+            all_items.extend(items)
+            
+            # Check for nextLink (pagination)
+            next_link = data.get('@odata.nextLink')
+            if next_link:
+                logger.debug(f"Following nextLink: page {page_num} -> {page_num + 1} ({len(items)} items) [{context}]")
+                url = next_link
+                time.sleep(0.1)  # Be nice to the API
+            else:
+                url = None
+        
+        return all_items, errors
+
+
+# ============================================================================
+# OneNote Exporter v3.0
+# ============================================================================
+class OneNoteExporter:
+    """Main exporter class with interactive selection and robust handling."""
+    
+    def __init__(self, settings: Dict[str, Any] = None):
+        self.settings = settings or {}
+        self.graph = GraphClient(
+            max_retries=self.settings.get('export', {}).get('max_retries', DEFAULT_MAX_RETRIES)
+        )
         self.export_root = None
+        self.user_info = {}
+        self.preflight_data = {}
+        self.preflight_errors = []
+        self.export_errors = []
+        self.skipped_items = []
+        
         self.stats = {
             'notebooks': 0,
+            'section_groups': 0,
             'sections': 0,
             'pages': 0,
+            'child_pages': 0,
             'attachments': 0,
-            'audio_files': 0,
             'images': 0,
-            'pdfs': 0,
             'errors': 0
         }
         
-    def authenticate(self):
-        """Authenticate with Microsoft Graph API"""
-        print("\n" + "="*70)
-        print("OneNote Export Tool - Authentication")
-        print("="*70)
-        print("\n📋 You need a Microsoft App Registration to use this tool.")
-        print("\nQuick Setup Instructions:")
-        print("1. Go to: https://entra.microsoft.com/")
-        print("2. Navigate to App registrations → New registration")
-        print("3. Name: 'OneNote Exporter'")
-        print("4. Supported accounts: 'Personal Microsoft accounts only'")
-        print("5. Redirect URI: Web → http://localhost:8080")
-        print("6. After registration:")
-        print("   - Copy Application (client) ID")
-        print("   - Create Client Secret (Certificates & secrets)")
-        print("   - Add API permissions: Notes.Read, Notes.Read.All (Delegated)")
-        print("   - Grant admin consent")
-        print("="*70 + "\n")
+        # Load settings
+        auth_settings = self.settings.get('auth', {})
+        self.graph.client_id = auth_settings.get('client_id')
+        self.graph.tenant_id = auth_settings.get('tenant', 'consumers')
         
-        self.client_id = input("Enter Application (client) ID: ").strip()
-        self.client_secret = getpass.getpass("Enter Client Secret (hidden): ")
-        self.tenant_id = input("Enter Tenant ID (or 'common' for personal): ").strip() or "common"
+        export_settings = self.settings.get('export', {})
+        self.output_root = export_settings.get('output_root')
+        self.export_format = export_settings.get('format', 'joplin')
+        self.preflight_mode = export_settings.get('preflight_mode', 'counts_only')
         
-        return self.delegated_auth_flow()
+        # Selection state
+        self.selected_notebook = None
+        self.selected_section = None
+
+    def authenticate(self) -> bool:
+        """Authenticate with Microsoft Graph API."""
+        print("\n" + "=" * 70)
+        print(f"OneNote Export Tool v{VERSION} - Authentication")
+        print("=" * 70)
+        
+        # Check for client_id from settings
+        if self.graph.client_id:
+            logger.info(f"✓ Client ID loaded from settings.json")
+            use_saved = input(f"  Use client ID '{self.graph.client_id[:8]}...'? [Y/n]: ").strip().lower()
+            if use_saved == 'n':
+                self.graph.client_id = None
+        
+        if not self.graph.client_id:
+            print("\n📋 You need a Microsoft App Registration to use this tool.")
+            print("\nQuick Setup:")
+            print("1. Go to: https://entra.microsoft.com/")
+            print("2. App registrations → New registration")
+            print("3. Redirect URI: Web → http://localhost:8080")
+            print("4. Add API permissions: Notes.Read, Notes.Read.All, User.Read")
+            print("=" * 70 + "\n")
+            self.graph.client_id = input("Enter Application (client) ID: ").strip()
+        
+        # Client secret - check env var first, then prompt
+        self.graph.client_secret = os.environ.get('ONENOTE_CLIENT_SECRET')
+        if self.graph.client_secret:
+            logger.info("✓ Client secret loaded from ONENOTE_CLIENT_SECRET env var")
+        else:
+            print("\n🔐 Client secret required (never stored on disk)")
+            self.graph.client_secret = getpass.getpass("Enter Client Secret (hidden): ")
+        
+        if not self.graph.client_secret:
+            logger.error("Client secret is required")
+            return False
+        
+        # Tenant
+        if not self.graph.tenant_id:
+            self.graph.tenant_id = input("Enter Tenant ID [consumers]: ").strip() or 'consumers'
+        
+        return self._delegated_auth_flow()
     
-    def delegated_auth_flow(self):
-        """Interactive auth flow for personal accounts"""
-        print("\n🔐 Starting authentication...")
-        print("A browser window will open for you to sign in.\n")
+    def _delegated_auth_flow(self) -> bool:
+        """Interactive OAuth flow."""
+        logger.info("\n🔐 Starting authentication...")
         
         redirect_uri = "http://localhost:8080"
-        scope = "Notes.Read Notes.Read.All offline_access"
-        auth_url = f"https://login.microsoftonline.com/{self.tenant_id}/oauth2/v2.0/authorize"
-        auth_url += f"?client_id={self.client_id}"
-        auth_url += f"&response_type=code"
-        auth_url += f"&redirect_uri={redirect_uri}"
-        auth_url += f"&scope={scope}"
+        scope = "Notes.Read Notes.Read.All User.Read offline_access"
+        auth_url = (
+            f"https://login.microsoftonline.com/{self.graph.tenant_id}/oauth2/v2.0/authorize"
+            f"?client_id={self.graph.client_id}"
+            f"&response_type=code"
+            f"&redirect_uri={redirect_uri}"
+            f"&scope={scope}"
+        )
         
         print("Opening browser for authentication...")
         webbrowser.open(auth_url)
@@ -85,641 +424,967 @@ class OneNoteExporter:
         try:
             parsed = urlparse(redirect_response)
             code = parse_qs(parsed.query)['code'][0]
-        except:
-            print("❌ Could not extract authorization code from URL")
+        except Exception:
+            logger.error("Could not extract authorization code from URL")
             return False
         
-        token_url = f"https://login.microsoftonline.com/{self.tenant_id}/oauth2/v2.0/token"
+        token_url = f"https://login.microsoftonline.com/{self.graph.tenant_id}/oauth2/v2.0/token"
         data = {
-            'client_id': self.client_id,
-            'client_secret': self.client_secret,
+            'client_id': self.graph.client_id,
+            'client_secret': self.graph.client_secret,
             'code': code,
             'redirect_uri': redirect_uri,
             'grant_type': 'authorization_code'
         }
         
         try:
-            response = requests.post(token_url, data=data)
+            response = requests.post(token_url, data=data, timeout=30)
             result = response.json()
             
             if 'access_token' in result:
-                self.access_token = result['access_token']
-                self.refresh_token = result.get('refresh_token')
-                print("✅ Successfully authenticated!\n")
+                self.graph.access_token = result['access_token']
+                self.graph.refresh_token = result.get('refresh_token')
+                logger.info("✅ Successfully authenticated!")
+                self._fetch_user_info()
                 return True
             else:
-                print(f"❌ Authentication failed: {result.get('error_description', 'Unknown error')}")
+                logger.error(f"Auth failed: {result.get('error_description', 'Unknown')}")
                 return False
         except Exception as e:
-            print(f"❌ Authentication error: {e}")
+            logger.error(f"Authentication error: {e}")
             return False
     
-    def refresh_access_token(self):
-        """Refresh the access token"""
-        if not self.refresh_token:
+    def _fetch_user_info(self):
+        """Get signed-in user info."""
+        response = self.graph.make_request(f"{GRAPH_BASE}/me", "user info")
+        if response and response.status_code == 200:
+            data = response.json()
+            self.user_info = {
+                'displayName': data.get('displayName', 'Unknown'),
+                'mail': data.get('mail') or data.get('userPrincipalName', 'Unknown'),
+            }
+            logger.info(f"   Signed in as: {self.user_info['displayName']} ({self.user_info['mail']})")
+    
+    # =========================================================================
+    # Interactive Selection
+    # =========================================================================
+    
+    def select_export_scope(self) -> bool:
+        """Interactive notebook and section selection."""
+        print("\n" + "=" * 70)
+        print("📚 SELECT EXPORT SCOPE")
+        print("=" * 70)
+        
+        # Get all notebooks
+        logger.info("\nFetching notebooks...")
+        notebooks, errors = self.graph.get_all_pages(
+            f"{GRAPH_BASE}/me/onenote/notebooks",
+            "list notebooks"
+        )
+        
+        if errors:
+            for err in errors:
+                logger.warning(f"Error fetching notebooks: {err}")
+        
+        if not notebooks:
+            logger.error("No notebooks found!")
             return False
         
-        print("🔄 Refreshing access token...")
-        token_url = f"https://login.microsoftonline.com/{self.tenant_id}/oauth2/v2.0/token"
-        data = {
-            'client_id': self.client_id,
-            'client_secret': self.client_secret,
-            'refresh_token': self.refresh_token,
-            'grant_type': 'refresh_token'
+        # Notebook selection
+        print(f"\nFound {len(notebooks)} notebook(s):\n")
+        print("  0. Export ALL notebooks")
+        for idx, nb in enumerate(notebooks, 1):
+            print(f"  {idx}. {nb.get('displayName', 'Untitled')}")
+        
+        choice = input("\nSelect notebook [0]: ").strip()
+        
+        if choice == '' or choice == '0':
+            self.selected_notebook = None  # Export all
+            logger.info("Selected: ALL notebooks")
+            return True
+        
+        try:
+            nb_idx = int(choice) - 1
+            if 0 <= nb_idx < len(notebooks):
+                self.selected_notebook = notebooks[nb_idx]
+                logger.info(f"Selected notebook: {self.selected_notebook['displayName']}")
+            else:
+                logger.error("Invalid selection")
+                return False
+        except ValueError:
+            logger.error("Invalid input")
+            return False
+        
+        # Section selection (only if single notebook selected)
+        if self.selected_notebook:
+            return self._select_section()
+        
+        return True
+    
+    def _select_section(self) -> bool:
+        """Select a section within the selected notebook."""
+        nb_id = self.selected_notebook['id']
+        nb_name = self.selected_notebook['displayName']
+        
+        logger.info(f"\nFetching sections for '{nb_name}'...")
+        
+        # Get direct sections
+        sections, errors = self.graph.get_all_pages(
+            f"{GRAPH_BASE}/me/onenote/notebooks/{nb_id}/sections",
+            f"sections in {nb_name}"
+        )
+        
+        # Get section groups and their sections
+        section_groups, sg_errors = self.graph.get_all_pages(
+            f"{GRAPH_BASE}/me/onenote/notebooks/{nb_id}/sectionGroups",
+            f"section groups in {nb_name}"
+        )
+        
+        all_sections = []
+        section_map = {}  # idx -> (section, parent_path)
+        
+        # Add direct sections
+        for sec in sections:
+            all_sections.append((sec, ""))
+        
+        # Add sections from section groups (recursive)
+        def add_sections_from_group(sg, parent_path=""):
+            path = f"{parent_path}/{sg['displayName']}" if parent_path else sg['displayName']
+            
+            # Get sections in this group
+            sg_sections, _ = self.graph.get_all_pages(
+                f"{GRAPH_BASE}/me/onenote/sectionGroups/{sg['id']}/sections",
+                f"sections in group {path}"
+            )
+            for sec in sg_sections:
+                all_sections.append((sec, path))
+            
+            # Get nested groups
+            nested_groups, _ = self.graph.get_all_pages(
+                f"{GRAPH_BASE}/me/onenote/sectionGroups/{sg['id']}/sectionGroups",
+                f"nested groups in {path}"
+            )
+            for nested in nested_groups:
+                add_sections_from_group(nested, path)
+        
+        for sg in section_groups:
+            add_sections_from_group(sg)
+        
+        if not all_sections:
+            logger.warning("No sections found in this notebook")
+            return True
+        
+        print(f"\nFound {len(all_sections)} section(s):\n")
+        print("  0. Export ALL sections")
+        for idx, (sec, path) in enumerate(all_sections, 1):
+            sec_name = sec.get('displayName', 'Untitled')
+            display = f"{path}/{sec_name}" if path else sec_name
+            print(f"  {idx}. {display}")
+        
+        choice = input("\nSelect section [0]: ").strip()
+        
+        if choice == '' or choice == '0':
+            self.selected_section = None  # Export all sections
+            logger.info("Selected: ALL sections")
+            return True
+        
+        try:
+            sec_idx = int(choice) - 1
+            if 0 <= sec_idx < len(all_sections):
+                self.selected_section = all_sections[sec_idx][0]
+                logger.info(f"Selected section: {self.selected_section['displayName']}")
+            else:
+                logger.error("Invalid selection")
+                return False
+        except ValueError:
+            logger.error("Invalid input")
+            return False
+        
+        return True
+    
+    # =========================================================================
+    # Preflight Scan
+    # =========================================================================
+    
+    def run_preflight(self) -> Dict:
+        """Perform preflight inventory scan."""
+        print("\n" + "=" * 70)
+        print("📋 PREFLIGHT INVENTORY SCAN")
+        print("=" * 70)
+        
+        # Determine scope description
+        if self.selected_notebook and self.selected_section:
+            scope = f"Section: {self.selected_section['displayName']} in {self.selected_notebook['displayName']}"
+        elif self.selected_notebook:
+            scope = f"Notebook: {self.selected_notebook['displayName']}"
+        else:
+            scope = "All notebooks"
+        
+        logger.info(f"Scope: {scope}")
+        logger.info(f"Account: {self.user_info.get('displayName', 'Unknown')}")
+        logger.info(f"Tenant: {self.graph.tenant_id}")
+        logger.info(f"Mode: {self.preflight_mode}")
+        print()
+        
+        inventory = {
+            'scan_timestamp': datetime.now().isoformat(),
+            'account': self.user_info,
+            'tenant': self.graph.tenant_id,
+            'scope': scope,
+            'preflight_mode': self.preflight_mode,
+            'notebooks': [],
+            'errors': [],
+            'totals': {
+                'notebooks': 0,
+                'section_groups': 0,
+                'sections': 0,
+                'pages': 0
+            }
         }
         
-        try:
-            response = requests.post(token_url, data=data)
-            result = response.json()
+        # Get notebooks to scan
+        if self.selected_notebook:
+            notebooks = [self.selected_notebook]
+        else:
+            notebooks, errors = self.graph.get_all_pages(
+                f"{GRAPH_BASE}/me/onenote/notebooks",
+                "list notebooks"
+            )
+            inventory['errors'].extend(errors)
+        
+        inventory['totals']['notebooks'] = len(notebooks)
+        logger.info(f"Scanning {len(notebooks)} notebook(s)...\n")
+        
+        for nb_idx, notebook in enumerate(notebooks, 1):
+            nb_name = notebook.get('displayName', 'Untitled')
+            logger.info(f"[{nb_idx}/{len(notebooks)}] 📓 {nb_name}")
             
-            if 'access_token' in result:
-                self.access_token = result['access_token']
-                self.refresh_token = result.get('refresh_token', self.refresh_token)
-                print("✅ Token refreshed!")
-                return True
+            nb_data = {
+                'id': notebook['id'],
+                'name': nb_name,
+                'createdDateTime': notebook.get('createdDateTime'),
+                'lastModifiedDateTime': notebook.get('lastModifiedDateTime'),
+                'section_groups': [],
+                'sections': [],
+                'page_count': 0,
+                'errors': []
+            }
+            
+            # If single section selected, only scan that
+            if self.selected_section:
+                sec_data = self._scan_section(self.selected_section, nb_name)
+                nb_data['sections'].append(sec_data)
+                nb_data['page_count'] = sec_data['page_count']
+                inventory['totals']['sections'] += 1
+                inventory['totals']['pages'] += sec_data['page_count']
             else:
-                return False
-        except:
-            return False
-    
-    def make_api_request(self, url, method='GET', data=None):
-        """Make API request with automatic token refresh"""
-        headers = {'Authorization': f'Bearer {self.access_token}'}
-        
-        try:
-            if method == 'GET':
-                response = requests.get(url, headers=headers, timeout=60)
-            else:
-                response = requests.post(url, headers=headers, json=data, timeout=60)
+                # Scan all sections and section groups
+                nb_url = f"{GRAPH_BASE}/me/onenote/notebooks/{notebook['id']}"
+                
+                # Direct sections
+                sections, errors = self.graph.get_all_pages(
+                    f"{nb_url}/sections",
+                    f"sections in {nb_name}"
+                )
+                nb_data['errors'].extend(errors)
+                
+                for section in sections:
+                    sec_data = self._scan_section(section, nb_name)
+                    nb_data['sections'].append(sec_data)
+                    nb_data['page_count'] += sec_data['page_count']
+                    inventory['totals']['sections'] += 1
+                    inventory['totals']['pages'] += sec_data['page_count']
+                
+                # Section groups (recursive)
+                section_groups = self._scan_section_groups_recursive(
+                    nb_url, nb_name, inventory['totals']
+                )
+                nb_data['section_groups'] = section_groups
+                
+                for sg in section_groups:
+                    nb_data['page_count'] += self._count_pages_in_section_group(sg)
             
-            if response.status_code == 401 and self.refresh_token:
-                if self.refresh_access_token():
-                    headers['Authorization'] = f'Bearer {self.access_token}'
-                    if method == 'GET':
-                        response = requests.get(url, headers=headers, timeout=60)
-                    else:
-                        response = requests.post(url, headers=headers, json=data, timeout=60)
+            inventory['notebooks'].append(nb_data)
+            logger.info(f"      Total: {nb_data['page_count']} pages")
+        
+        self.preflight_data = inventory
+        self.preflight_errors = inventory['errors']
+        
+        print()
+        print("=" * 70)
+        print("📊 PREFLIGHT TOTALS")
+        print("=" * 70)
+        print(f"   Notebooks:      {inventory['totals']['notebooks']}")
+        print(f"   Section Groups: {inventory['totals']['section_groups']}")
+        print(f"   Sections:       {inventory['totals']['sections']}")
+        print(f"   Pages:          {inventory['totals']['pages']}")
+        if inventory['errors']:
+            print(f"   ⚠️  Errors:      {len(inventory['errors'])}")
+        print("=" * 70)
+        
+        return inventory
+    
+    def _scan_section(self, section: Dict, notebook_name: str) -> Dict:
+        """Scan a section and enumerate pages."""
+        sec_name = section.get('displayName', 'Untitled')
+        sec_id = section['id']
+        context = f"{notebook_name}/{sec_name}"
+        
+        # Get pages with pagination
+        pages, errors = self.graph.get_all_pages(
+            f"{GRAPH_BASE}/me/onenote/sections/{sec_id}/pages?$select=id,title,createdDateTime,lastModifiedDateTime,level,order&$orderby=order",
+            context
+        )
+        
+        # Log if we got zero pages but expected more
+        if not pages and errors:
+            logger.warning(f"Section '{sec_name}' returned 0 pages with errors!")
+            for err in errors:
+                logger.warning(f"  Error: {err}")
+        
+        # Build page hierarchy
+        page_list = []
+        child_count = 0
+        for p in pages:
+            level = p.get('level', 0)
+            if level > 0:
+                child_count += 1
+            page_list.append({
+                'id': p['id'],
+                'title': p.get('title', 'Untitled'),
+                'createdDateTime': p.get('createdDateTime'),
+                'lastModifiedDateTime': p.get('lastModifiedDateTime'),
+                'level': level,
+                'order': p.get('order', 0)
+            })
+        
+        page_info = f"{len(pages)} pages"
+        if child_count > 0:
+            page_info += f" ({child_count} child)"
+        logger.info(f"      📑 {sec_name}: {page_info}")
+        
+        return {
+            'id': sec_id,
+            'name': sec_name,
+            'page_count': len(pages),
+            'child_page_count': child_count,
+            'pages': page_list,
+            'errors': errors
+        }
+    
+    def _scan_section_groups_recursive(self, parent_url: str, parent_name: str, 
+                                       totals: Dict, depth: int = 0) -> List[Dict]:
+        """Recursively scan section groups."""
+        section_groups, errors = self.graph.get_all_pages(
+            f"{parent_url}/sectionGroups",
+            f"section groups under {parent_name}"
+        )
+        
+        result = []
+        indent = "      " + "  " * depth
+        
+        for sg in section_groups:
+            sg_name = sg.get('displayName', 'Untitled')
+            logger.info(f"{indent}📁 {sg_name}")
+            totals['section_groups'] += 1
             
-            return response
-        except Exception as e:
-            print(f"❌ API request error: {e}")
-            return None
-    
-    def get_notebooks(self):
-        """Get all OneNote notebooks"""
-        url = "https://graph.microsoft.com/v1.0/me/onenote/notebooks"
-        response = self.make_api_request(url)
+            sg_data = {
+                'id': sg['id'],
+                'name': sg_name,
+                'sections': [],
+                'section_groups': [],
+                'errors': errors
+            }
+            
+            sg_url = f"{GRAPH_BASE}/me/onenote/sectionGroups/{sg['id']}"
+            
+            # Get sections in this group
+            sections, sec_errors = self.graph.get_all_pages(
+                f"{sg_url}/sections",
+                f"sections in {parent_name}/{sg_name}"
+            )
+            sg_data['errors'].extend(sec_errors)
+            
+            for section in sections:
+                sec_data = self._scan_section(section, f"{parent_name}/{sg_name}")
+                sg_data['sections'].append(sec_data)
+                totals['sections'] += 1
+                totals['pages'] += sec_data['page_count']
+            
+            # Recurse into nested section groups
+            nested = self._scan_section_groups_recursive(
+                sg_url, f"{parent_name}/{sg_name}", totals, depth + 1
+            )
+            sg_data['section_groups'] = nested
+            
+            result.append(sg_data)
         
-        if response and response.status_code == 200:
-            return response.json().get('value', [])
-        return []
+        return result
     
-    def get_sections(self, notebook_id):
-        """Get all sections in a notebook"""
-        url = f"https://graph.microsoft.com/v1.0/me/onenote/notebooks/{notebook_id}/sections"
-        response = self.make_api_request(url)
+    def _count_pages_in_section_group(self, sg: Dict) -> int:
+        """Count total pages in a section group including nested groups."""
+        count = sum(s['page_count'] for s in sg.get('sections', []))
+        for nested in sg.get('section_groups', []):
+            count += self._count_pages_in_section_group(nested)
+        return count
+    
+    # =========================================================================
+    # Index File Generation
+    # =========================================================================
+    
+    def write_index_files(self, output_path: Path):
+        """Write index.md and index.json before export."""
+        if not self.preflight_data:
+            return
         
-        if response and response.status_code == 200:
-            return response.json().get('value', [])
-        return []
-    
-    def get_pages(self, section_id):
-        """Get all pages in a section"""
-        url = f"https://graph.microsoft.com/v1.0/me/onenote/sections/{section_id}/pages"
-        response = self.make_api_request(url)
+        # Write JSON
+        json_path = output_path / 'index.json'
+        save_json(json_path, self.preflight_data)
+        logger.info(f"✓ Wrote {json_path}")
         
-        if response and response.status_code == 200:
-            return response.json().get('value', [])
-        return []
+        # Write Markdown
+        md_path = output_path / 'index.md'
+        md_content = self._generate_index_markdown()
+        with open(md_path, 'w', encoding='utf-8') as f:
+            f.write(md_content)
+        logger.info(f"✓ Wrote {md_path}")
     
-    def get_page_content(self, page_id):
-        """Get page content in HTML format"""
-        url = f"https://graph.microsoft.com/v1.0/me/onenote/pages/{page_id}/content"
-        response = self.make_api_request(url)
+    def _generate_index_markdown(self) -> str:
+        """Generate index.md content."""
+        data = self.preflight_data
+        lines = [
+            "# OneNote Export Index",
+            "",
+            f"**Generated:** {data.get('scan_timestamp', 'Unknown')}",
+            f"**Account:** {data.get('account', {}).get('displayName', 'Unknown')}",
+            f"**Email:** {data.get('account', {}).get('mail', 'Unknown')}",
+            f"**Tenant:** {data.get('tenant', 'Unknown')}",
+            f"**Scope:** {data.get('scope', 'Unknown')}",
+            "",
+            "## Summary",
+            "",
+            "| Metric | Count |",
+            "|--------|-------|",
+            f"| Notebooks | {data['totals']['notebooks']} |",
+            f"| Section Groups | {data['totals']['section_groups']} |",
+            f"| Sections | {data['totals']['sections']} |",
+            f"| **Total Pages** | **{data['totals']['pages']}** |",
+            ""
+        ]
         
-        if response and response.status_code == 200:
-            return response.text
-        return None
+        # Errors section
+        if data.get('errors'):
+            lines.append("## ⚠️ Errors During Scan")
+            lines.append("")
+            for err in data['errors'][:20]:  # Limit to 20
+                lines.append(f"- {err.get('context', 'Unknown')}: {err.get('error', 'Unknown error')}")
+            if len(data['errors']) > 20:
+                lines.append(f"- ... and {len(data['errors']) - 20} more errors")
+            lines.append("")
+        
+        lines.append("## Notebooks")
+        lines.append("")
+        
+        for nb in data.get('notebooks', []):
+            lines.append(f"### 📓 {nb['name']}")
+            lines.append(f"- Total Pages: {nb['page_count']}")
+            lines.append(f"- Created: {nb.get('createdDateTime', 'Unknown')}")
+            lines.append(f"- Modified: {nb.get('lastModifiedDateTime', 'Unknown')}")
+            lines.append("")
+            
+            if nb.get('sections'):
+                lines.append("#### Sections")
+                lines.append("")
+                for sec in nb['sections']:
+                    child_info = f" ({sec.get('child_page_count', 0)} child)" if sec.get('child_page_count', 0) > 0 else ""
+                    lines.append(f"- 📑 **{sec['name']}**: {sec['page_count']} pages{child_info}")
+                lines.append("")
+            
+            if nb.get('section_groups'):
+                lines.append("#### Section Groups")
+                lines.append("")
+                for sg in nb['section_groups']:
+                    self._append_section_group_md(lines, sg, 0)
+                lines.append("")
+        
+        return "\n".join(lines)
     
-    def sanitize_filename(self, filename):
-        """Sanitize filename for filesystem"""
-        # Remove or replace invalid characters
+    def _append_section_group_md(self, lines: List[str], sg: Dict, depth: int):
+        """Append section group to markdown lines."""
+        indent = "  " * depth
+        pages = self._count_pages_in_section_group(sg)
+        lines.append(f"{indent}- 📁 **{sg['name']}** ({pages} pages)")
+        
+        for sec in sg.get('sections', []):
+            child_info = f" ({sec.get('child_page_count', 0)} child)" if sec.get('child_page_count', 0) > 0 else ""
+            lines.append(f"{indent}  - 📑 {sec['name']}: {sec['page_count']} pages{child_info}")
+        
+        for nested in sg.get('section_groups', []):
+            self._append_section_group_md(lines, nested, depth + 1)
+    
+    # =========================================================================
+    # Export Logic
+    # =========================================================================
+    
+    def sanitize_filename(self, filename: str) -> str:
+        """Sanitize filename for filesystem."""
         filename = re.sub(r'[<>:"/\\|?*]', '_', filename)
         filename = filename.strip('. ')
-        if not filename:
-            filename = 'untitled'
-        return filename[:200]  # Limit length
+        return filename[:200] if filename else 'untitled'
     
-    def extract_attachments(self, html_content, page_path):
-        """Extract and download all attachments from page HTML"""
-        attachments = []
-        attachments_dir = page_path.parent / f"{page_path.stem}_attachments"
-        attachments_dir.mkdir(exist_ok=True)
-        
-        # Find all data-attachment tags (embedded files)
-        attachment_pattern = r'data-attachment="([^"]+)"[^>]*src="([^"]+)"'
-        for match in re.finditer(attachment_pattern, html_content):
-            filename = match.group(1)
-            url = match.group(2)
-            
-            if url.startswith('data:'):
-                # Base64 embedded data
-                self.save_base64_attachment(url, filename, attachments_dir)
-                attachments.append(filename)
-            else:
-                # URL to download
-                self.download_attachment(url, filename, attachments_dir)
-                attachments.append(filename)
-        
-        # Find all img tags
-        img_pattern = r'<img[^>]*src="([^"]+)"[^>]*(?:data-fullres-src="([^"]+)")?'
-        img_count = 0
-        for match in re.finditer(img_pattern, html_content):
-            img_count += 1
-            src = match.group(1)
-            fullres = match.group(2) if match.group(2) else src
-            
-            # Use fullres if available
-            url = fullres if fullres else src
-            
-            if url.startswith('data:'):
-                filename = f"image_{img_count}.png"
-                self.save_base64_attachment(url, filename, attachments_dir)
-                attachments.append(filename)
-                self.stats['images'] += 1
-            elif url.startswith('http'):
-                # Extract extension from URL or use png
-                ext = self.get_extension_from_url(url) or 'png'
-                filename = f"image_{img_count}.{ext}"
-                if self.download_attachment(url, filename, attachments_dir):
-                    attachments.append(filename)
-                    self.stats['images'] += 1
-        
-        # Find all object/embed tags (PDFs, audio, video)
-        object_pattern = r'<object[^>]*data="([^"]+)"[^>]*type="([^"]+)"'
-        for match in re.finditer(object_pattern, html_content):
-            url = match.group(1)
-            mime_type = match.group(2)
-            
-            ext = mimetypes.guess_extension(mime_type) or '.bin'
-            filename = f"attachment_{len(attachments) + 1}{ext}"
-            
-            if self.download_attachment(url, filename, attachments_dir):
-                attachments.append(filename)
-                self.stats['attachments'] += 1
-                
-                if 'audio' in mime_type:
-                    self.stats['audio_files'] += 1
-                elif 'pdf' in mime_type:
-                    self.stats['pdfs'] += 1
-        
-        # Find audio tags
-        audio_pattern = r'<audio[^>]*src="([^"]+)"'
-        audio_count = 0
-        for match in re.finditer(audio_pattern, html_content):
-            audio_count += 1
-            url = match.group(1)
-            ext = self.get_extension_from_url(url) or 'm4a'
-            filename = f"audio_{audio_count}.{ext}"
-            
-            if self.download_attachment(url, filename, attachments_dir):
-                attachments.append(filename)
-                self.stats['audio_files'] += 1
-        
-        return attachments, attachments_dir
-    
-    def save_base64_attachment(self, data_url, filename, attachments_dir):
-        """Save base64 encoded attachment"""
-        try:
-            # Parse data URL: data:mime/type;base64,xxxxx
-            match = re.match(r'data:([^;]+);base64,(.+)', data_url)
-            if match:
-                mime_type = match.group(1)
-                base64_data = match.group(2)
-                
-                # Decode base64
-                file_data = base64.b64decode(base64_data)
-                
-                # Determine extension
-                ext = mimetypes.guess_extension(mime_type)
-                if ext and not filename.endswith(ext):
-                    filename = f"{filename}{ext}"
-                
-                filepath = attachments_dir / self.sanitize_filename(filename)
-                with open(filepath, 'wb') as f:
-                    f.write(file_data)
-                
-                return True
-        except Exception as e:
-            print(f"  ⚠️  Failed to save base64 attachment {filename}: {e}")
-            self.stats['errors'] += 1
-        return False
-    
-    def download_attachment(self, url, filename, attachments_dir):
-        """Download attachment from URL"""
-        try:
-            headers = {'Authorization': f'Bearer {self.access_token}'}
-            response = requests.get(url, headers=headers, timeout=120)
-            
-            if response.status_code == 200:
-                filepath = attachments_dir / self.sanitize_filename(filename)
-                with open(filepath, 'wb') as f:
-                    f.write(response.content)
-                return True
-        except Exception as e:
-            print(f"  ⚠️  Failed to download {filename}: {e}")
-            self.stats['errors'] += 1
-        return False
-    
-    def get_extension_from_url(self, url):
-        """Extract file extension from URL"""
-        path = urlparse(url).path
-        ext = Path(path).suffix
-        return ext.lstrip('.') if ext else None
-    
-    def convert_html_to_markdown(self, html_content):
-        """Convert HTML to Markdown (simple conversion)"""
-        # This is a basic conversion - for production use, consider using html2text library
-        md = html_content
-        
-        # Remove OneNote-specific tags
-        md = re.sub(r'<\?xml[^>]*>', '', md)
-        md = re.sub(r'data-id="[^"]*"', '', md)
-        
-        # Convert headers
-        md = re.sub(r'<h1[^>]*>(.*?)</h1>', r'# \1\n', md, flags=re.DOTALL)
-        md = re.sub(r'<h2[^>]*>(.*?)</h2>', r'## \1\n', md, flags=re.DOTALL)
-        md = re.sub(r'<h3[^>]*>(.*?)</h3>', r'### \1\n', md, flags=re.DOTALL)
-        
-        # Convert lists
-        md = re.sub(r'<ul[^>]*>', '\n', md)
-        md = re.sub(r'</ul>', '\n', md)
-        md = re.sub(r'<li[^>]*>(.*?)</li>', r'- \1\n', md, flags=re.DOTALL)
-        
-        # Convert formatting
-        md = re.sub(r'<strong[^>]*>(.*?)</strong>', r'**\1**', md, flags=re.DOTALL)
-        md = re.sub(r'<em[^>]*>(.*?)</em>', r'*\1*', md, flags=re.DOTALL)
-        md = re.sub(r'<b[^>]*>(.*?)</b>', r'**\1**', md, flags=re.DOTALL)
-        md = re.sub(r'<i[^>]*>(.*?)</i>', r'*\1*', md, flags=re.DOTALL)
-        
-        # Convert links
-        md = re.sub(r'<a[^>]*href="([^"]+)"[^>]*>(.*?)</a>', r'[\2](\1)', md, flags=re.DOTALL)
-        
-        # Convert images
-        md = re.sub(r'<img[^>]*src="([^"]+)"[^>]*alt="([^"]*)"[^>]*>', r'![\2](\1)', md)
-        md = re.sub(r'<img[^>]*src="([^"]+)"[^>]*>', r'![](\1)', md)
-        
-        # Remove remaining HTML tags
-        md = re.sub(r'<[^>]+>', '', md)
-        
-        # Clean up whitespace
-        md = re.sub(r'\n\s*\n\s*\n', '\n\n', md)
-        
-        # Decode HTML entities
-        md = html.unescape(md)
-        
-        return md.strip()
-    
-    def export_for_joplin(self, notebook_folder, page_title, page_content, attachments_dir, metadata):
-        """Export page in Joplin format (Markdown with frontmatter)"""
-        md_content = self.convert_html_to_markdown(page_content)
-        
-        # Update image/attachment references
-        if attachments_dir.exists():
-            attachment_folder_name = attachments_dir.name
-            md_content = re.sub(
-                r'!\[([^\]]*)\]\((?:data:[^)]+|https?://[^)]+)\)',
-                rf'![\1]({attachment_folder_name}/image_\1.png)',
-                md_content
-            )
-        
-        # Create Joplin markdown file
-        joplin_file = notebook_folder / 'joplin' / f"{self.sanitize_filename(page_title)}.md"
-        joplin_file.parent.mkdir(parents=True, exist_ok=True)
-        
-        with open(joplin_file, 'w', encoding='utf-8') as f:
-            f.write(f"# {page_title}\n\n")
-            f.write(f"Created: {metadata['created']}\n")
-            f.write(f"Modified: {metadata['modified']}\n\n")
-            f.write(md_content)
-        
-        return joplin_file
-    
-    def export_for_evernote(self, notebook_folder, page_title, page_content, attachments, metadata):
-        """Export page in ENEX format (Evernote XML)"""
-        # Create ENEX file
-        enex_file = notebook_folder / 'evernote' / f"{self.sanitize_filename(page_title)}.enex"
-        enex_file.parent.mkdir(parents=True, exist_ok=True)
-        
-        # Clean HTML for Evernote
-        content = page_content
-        content = re.sub(r'data-id="[^"]*"', '', content)
-        content = html.escape(content)
-        
-        enex_content = f"""<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE en-export SYSTEM "http://xml.evernote.com/pub/evernote-export3.dtd">
-<en-export export-date="{datetime.now().strftime('%Y%m%dT%H%M%SZ')}" application="OneNote Exporter" version="1.0">
-  <note>
-    <title>{html.escape(page_title)}</title>
-    <content><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
-<en-note>
-{content}
-</en-note>]]></content>
-    <created>{metadata['created']}</created>
-    <updated>{metadata['modified']}</updated>
-  </note>
-</en-export>
-"""
-        
-        with open(enex_file, 'w', encoding='utf-8') as f:
-            f.write(enex_content)
-        
-        return enex_file
-    
-    def export_notebook(self, notebook, export_formats=['both']):
-        """Export a single notebook"""
-        notebook_name = self.sanitize_filename(notebook['displayName'])
-        notebook_folder = self.export_root / notebook_name
-        notebook_folder.mkdir(exist_ok=True)
-        
-        print(f"\n📓 Exporting notebook: {notebook['displayName']}")
-        print(f"   Location: {notebook_folder}")
-        
-        sections = self.get_sections(notebook['id'])
-        self.stats['notebooks'] += 1
-        
-        for section in sections:
-            section_name = self.sanitize_filename(section['displayName'])
-            section_folder = notebook_folder / section_name
-            section_folder.mkdir(exist_ok=True)
-            
-            print(f"\n  📑 Section: {section['displayName']}")
-            self.stats['sections'] += 1
-            
-            pages = self.get_pages(section['id'])
-            
-            for idx, page in enumerate(pages, 1):
-                try:
-                    page_title = page['title'] or f"Untitled_{idx}"
-                    print(f"    [{idx}/{len(pages)}] 📄 {page_title[:50]}", end='')
-                    
-                    # Get page content
-                    page_content = self.get_page_content(page['id'])
-                    if not page_content:
-                        print(" ⚠️  No content")
-                        continue
-                    
-                    # Save raw HTML
-                    html_file = section_folder / f"{self.sanitize_filename(page_title)}.html"
-                    with open(html_file, 'w', encoding='utf-8') as f:
-                        f.write(page_content)
-                    
-                    # Extract attachments
-                    attachments, attachments_dir = self.extract_attachments(page_content, html_file)
-                    
-                    # Metadata
-                    metadata = {
-                        'created': page.get('createdDateTime', ''),
-                        'modified': page.get('lastModifiedDateTime', ''),
-                        'author': page.get('createdBy', {}).get('user', {}).get('displayName', 'Unknown')
-                    }
-                    
-                    # Export in requested formats
-                    if 'joplin' in export_formats or 'both' in export_formats:
-                        self.export_for_joplin(notebook_folder, page_title, page_content, attachments_dir, metadata)
-                    
-                    if 'evernote' in export_formats or 'both' in export_formats:
-                        self.export_for_evernote(notebook_folder, page_title, page_content, attachments, metadata)
-                    
-                    self.stats['pages'] += 1
-                    
-                    # Show attachment count
-                    if attachments:
-                        print(f" ✓ ({len(attachments)} attachments)")
-                    else:
-                        print(" ✓")
-                    
-                except Exception as e:
-                    print(f" ❌ Error: {e}")
-                    self.stats['errors'] += 1
-    
-    def export_all(self, destination_path, export_formats=['both']):
-        """Export all notebooks"""
+    def export_all(self, destination_path: str) -> bool:
+        """Export based on selection after preflight."""
         self.export_root = Path(destination_path)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.export_root = self.export_root / f"OneNote_Export_{timestamp}"
         self.export_root.mkdir(parents=True, exist_ok=True)
         
-        print(f"\n💾 Export destination: {self.export_root}\n")
-        print("="*70)
-        print("Starting OneNote Export")
-        print("="*70)
+        # Set up file logging
+        logger.set_log_file(self.export_root / 'run.log')
+        logger.info(f"Export started at {datetime.now().isoformat()}")
+        logger.info(f"Export destination: {self.export_root}")
         
-        notebooks = self.get_notebooks()
+        # Run preflight
+        self.run_preflight()
         
-        if not notebooks:
-            print("❌ No notebooks found!")
-            return False
+        # Write index files BEFORE export
+        self.write_index_files(self.export_root)
         
-        print(f"\nFound {len(notebooks)} notebook(s)")
+        print("\n" + "=" * 70)
+        print("📤 STARTING EXPORT")
+        print("=" * 70)
         
-        for notebook in notebooks:
-            try:
-                self.export_notebook(notebook, export_formats)
-            except Exception as e:
-                print(f"\n❌ Error exporting notebook {notebook['displayName']}: {e}")
-                self.stats['errors'] += 1
+        notebooks = self.preflight_data.get('notebooks', [])
+        total_notebooks = len(notebooks)
         
-        # Save export summary
-        summary_file = self.export_root / "export_summary.json"
-        with open(summary_file, 'w', encoding='utf-8') as f:
-            json.dump({
-                'timestamp': timestamp,
-                'statistics': self.stats,
-                'export_path': str(self.export_root)
-            }, f, indent=2)
+        for nb_idx, nb_data in enumerate(notebooks, 1):
+            self._export_notebook(nb_data, nb_idx, total_notebooks)
         
-        # Create README
-        self.create_import_instructions()
-        
-        # Print summary
-        self.print_summary()
+        # Save summary
+        self._save_export_summary()
         
         return True
     
-    def create_import_instructions(self):
-        """Create instructions for importing to other apps"""
-        readme_content = f"""# OneNote Export Summary
-
-Export Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
-## Statistics
-
-- Notebooks: {self.stats['notebooks']}
-- Sections: {self.stats['sections']}
-- Pages: {self.stats['pages']}
-- Total Attachments: {self.stats['attachments']}
-  - Images: {self.stats['images']}
-  - Audio Files: {self.stats['audio_files']}
-  - PDFs: {self.stats['pdfs']}
-- Errors: {self.stats['errors']}
-
-## Folder Structure
-
-```
-OneNote_Export_YYYYMMDD_HHMMSS/
-├── Notebook1/
-│   ├── Section1/
-│   │   ├── page1.html (raw HTML)
-│   │   ├── page1_attachments/ (images, audio, PDFs)
-│   │   └── ...
-│   ├── joplin/ (Markdown files for Joplin)
-│   └── evernote/ (ENEX files for Evernote)
-└── ...
-```
-
-## Importing to Joplin
-
-1. Open Joplin
-2. Go to File → Import → Markdown
-3. Select the 'joplin' folder from any notebook
-4. Joplin will import all markdown files
-5. Copy the corresponding '_attachments' folders to Joplin's resource folder
-   - Location: ~/.config/joplin-desktop/resources/ (Linux/Mac)
-   - Location: %USERPROFILE%/.config/joplin-desktop/resources/ (Windows)
-
-## Importing to Evernote
-
-1. Open Evernote desktop application
-2. Go to File → Import → Evernote Export Files (.enex)
-3. Select ENEX files from the 'evernote' folder
-4. Files will be imported into Evernote
-
-Note: Evernote has limitations on attachment types and sizes.
-
-## Importing to Notion
-
-1. For each page, use the HTML files directly
-2. In Notion: Import → HTML
-3. Select individual HTML files
-4. Manually add attachments from '_attachments' folders
-
-## Raw HTML Files
-
-All pages are also saved as raw HTML files in each section folder.
-These can be opened in any web browser or imported to other tools.
-
-## Attachments
-
-All attachments are saved in folders named `[page_name]_attachments/`
-These include:
-- Images (PNG, JPG, etc.)
-- Audio recordings (M4A, WAV, etc.)
-- PDF documents
-- Other embedded files
-
-## Troubleshooting
-
-### Missing Attachments
-- Some attachments may have failed to download due to:
-  - Network timeouts
-  - Microsoft API limitations
-  - File size restrictions
-
-### Format Issues
-- Some formatting may not transfer perfectly between apps
-- Review imported notes and adjust as needed
-
-### Large Exports
-- Very large notebooks may take a long time to export
-- Consider exporting notebooks individually if experiencing timeouts
-
-## Next Steps
-
-1. Review the exported content
-2. Import to your preferred note-taking app
-3. Verify that attachments are properly linked
-4. Delete the export folder once import is complete
-
-For issues or questions, please check the project documentation.
-"""
+    def _export_notebook(self, nb_data: Dict, nb_idx: int, total: int):
+        """Export a notebook with progress output."""
+        nb_name = self.sanitize_filename(nb_data['name'])
+        nb_folder = self.export_root / nb_name
+        nb_folder.mkdir(exist_ok=True)
         
-        readme_file = self.export_root / "README.md"
-        with open(readme_file, 'w', encoding='utf-8') as f:
-            f.write(readme_content)
+        logger.info(f"\n[{nb_idx}/{total}] 📓 {nb_data['name']} ({nb_data['page_count']} pages)")
+        self.stats['notebooks'] += 1
+        
+        # Export direct sections
+        for section in nb_data.get('sections', []):
+            self._export_section(section, nb_folder, nb_data['name'])
+        
+        # Export section groups
+        for sg in nb_data.get('section_groups', []):
+            self._export_section_group(sg, nb_folder, nb_data['name'])
     
-    def print_summary(self):
-        """Print export summary"""
-        print("\n" + "="*70)
-        print("📊 EXPORT SUMMARY")
-        print("="*70)
-        print(f"Notebooks exported:     {self.stats['notebooks']}")
-        print(f"Sections processed:     {self.stats['sections']}")
-        print(f"Pages exported:         {self.stats['pages']}")
-        print(f"Total attachments:      {self.stats['attachments']}")
-        print(f"  - Images:             {self.stats['images']}")
-        print(f"  - Audio files:        {self.stats['audio_files']}")
-        print(f"  - PDFs:               {self.stats['pdfs']}")
-        if self.stats['errors'] > 0:
-            print(f"Errors encountered:     {self.stats['errors']}")
-        print(f"\nExport location:        {self.export_root}")
-        print(f"Import instructions:    {self.export_root / 'README.md'}")
-        print("="*70)
+    def _export_section_group(self, sg_data: Dict, parent_folder: Path, parent_path: str):
+        """Export a section group."""
+        sg_name = self.sanitize_filename(sg_data['name'])
+        sg_folder = parent_folder / sg_name
+        sg_folder.mkdir(exist_ok=True)
+        
+        full_path = f"{parent_path}/{sg_data['name']}"
+        logger.info(f"   📁 {sg_data['name']}")
+        self.stats['section_groups'] += 1
+        
+        for section in sg_data.get('sections', []):
+            self._export_section(section, sg_folder, full_path)
+        
+        for nested in sg_data.get('section_groups', []):
+            self._export_section_group(nested, sg_folder, full_path)
+    
+    def _export_section(self, section_data: Dict, parent_folder: Path, parent_path: str):
+        """Export a section with hierarchy support."""
+        sec_name = self.sanitize_filename(section_data['name'])
+        sec_folder = parent_folder / sec_name
+        sec_folder.mkdir(exist_ok=True)
+        
+        pages = section_data.get('pages', [])
+        total_pages = len(pages)
+        child_count = section_data.get('child_page_count', 0)
+        
+        child_info = f" ({child_count} child)" if child_count > 0 else ""
+        logger.info(f"      📑 {section_data['name']} ({total_pages} pages{child_info})")
+        self.stats['sections'] += 1
+        
+        # Build page hierarchy map
+        page_hierarchy = self._build_page_hierarchy(pages)
+        
+        for page_idx, page_info in enumerate(pages, 1):
+            self._export_page(page_info, sec_folder, page_idx, total_pages, 
+                            section_data['name'], page_hierarchy)
+    
+    def _build_page_hierarchy(self, pages: List[Dict]) -> Dict[str, List[Dict]]:
+        """Build parent->children map based on page levels."""
+        # Sort by order to maintain sequence
+        sorted_pages = sorted(pages, key=lambda p: p.get('order', 0))
+        
+        hierarchy = {}
+        parent_stack = []  # Stack of (page_id, level)
+        
+        for page in sorted_pages:
+            level = page.get('level', 0)
+            page_id = page['id']
+            
+            # Pop stack until we find appropriate parent
+            while parent_stack and parent_stack[-1][1] >= level:
+                parent_stack.pop()
+            
+            # If we have a parent, record the relationship
+            if parent_stack and level > 0:
+                parent_id = parent_stack[-1][0]
+                if parent_id not in hierarchy:
+                    hierarchy[parent_id] = []
+                hierarchy[parent_id].append(page)
+            
+            # Push current page as potential parent
+            parent_stack.append((page_id, level))
+        
+        return hierarchy
+    
+    def _export_page(self, page_info: Dict, section_folder: Path, idx: int, 
+                    total: int, section_name: str, hierarchy: Dict):
+        """Export a single page with hierarchy support."""
+        page_title = page_info.get('title', 'Untitled')
+        page_id = page_info['id']
+        level = page_info.get('level', 0)
+        
+        # Progress output
+        level_indicator = "  " * level if level > 0 else ""
+        child_count = len(hierarchy.get(page_id, []))
+        child_info = f" (+{child_count} children)" if child_count > 0 else ""
+        
+        sys.stdout.write(f"\r         [{idx}/{total}] {level_indicator}{page_title[:35]:<35}{child_info}")
+        sys.stdout.flush()
+        
+        try:
+            # Determine folder based on hierarchy
+            if level > 0:
+                self.stats['child_pages'] += 1
+            
+            # Create page folder for pages with children
+            safe_title = self.sanitize_filename(page_title)
+            if hierarchy.get(page_id):
+                page_folder = section_folder / safe_title
+                page_folder.mkdir(exist_ok=True)
+                html_path = page_folder / f"{safe_title}.html"
+            else:
+                page_folder = section_folder
+                html_path = section_folder / f"{safe_title}.html"
+            
+            # Get page content
+            response = self.graph.make_request(
+                f"{GRAPH_BASE}/me/onenote/pages/{page_id}/content",
+                f"{section_name}/{page_title}",
+                timeout=120
+            )
+            
+            if not response or response.status_code != 200:
+                error_msg = f"Failed to get content (status: {response.status_code if response else 'None'})"
+                self.export_errors.append({
+                    'type': 'page_content',
+                    'page': page_title,
+                    'section': section_name,
+                    'error': error_msg
+                })
+                self.stats['errors'] += 1
+                logger.debug(f"Error exporting page {page_title}: {error_msg}")
+                return
+            
+            content = response.text
+            
+            # Save HTML
+            with open(html_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+            
+            # Extract attachments
+            attachments = self._extract_attachments(content, html_path)
+            
+            # Export to format
+            metadata = {
+                'created': page_info.get('createdDateTime', ''),
+                'modified': page_info.get('lastModifiedDateTime', ''),
+                'level': level
+            }
+            
+            if self.export_format in ('joplin', 'both'):
+                self._export_joplin(page_folder, page_title, content, metadata)
+            
+            if self.export_format in ('enex', 'both'):
+                self._export_enex(page_folder, page_title, content, attachments, metadata)
+            
+            self.stats['pages'] += 1
+            
+        except Exception as e:
+            self.export_errors.append({
+                'type': 'exception',
+                'page': page_title,
+                'section': section_name,
+                'error': str(e)
+            })
+            self.stats['errors'] += 1
+            logger.debug(f"Exception exporting {page_title}: {e}")
+        
+        # Clear progress line at end
+        if idx == total:
+            sys.stdout.write("\r" + " " * 80 + "\r")
+            sys.stdout.flush()
+    
+    def _extract_attachments(self, html_content: str, page_path: Path) -> List[str]:
+        """Extract and download attachments."""
+        attachments = []
+        attachments_dir = page_path.parent / f"{page_path.stem}_attachments"
+        
+        img_pattern = r'<img[^>]*src="([^"]+)"'
+        img_count = 0
+        
+        for match in re.finditer(img_pattern, html_content):
+            src = match.group(1)
+            img_count += 1
+            
+            if src.startswith('data:'):
+                if not attachments_dir.exists():
+                    attachments_dir.mkdir()
+                filename = f"image_{img_count}.png"
+                self._save_base64(src, attachments_dir / filename)
+                attachments.append(filename)
+                self.stats['images'] += 1
+            elif src.startswith('http'):
+                if not attachments_dir.exists():
+                    attachments_dir.mkdir()
+                ext = self._get_ext_from_url(src) or 'png'
+                filename = f"image_{img_count}.{ext}"
+                if self._download_file(src, attachments_dir / filename):
+                    attachments.append(filename)
+                    self.stats['images'] += 1
+        
+        return attachments
+    
+    def _save_base64(self, data_url: str, filepath: Path):
+        """Save base64 data."""
+        try:
+            match = re.match(r'data:([^;]+);base64,(.+)', data_url)
+            if match:
+                data = base64.b64decode(match.group(2))
+                with open(filepath, 'wb') as f:
+                    f.write(data)
+        except Exception as e:
+            logger.debug(f"Base64 save error: {e}")
+    
+    def _download_file(self, url: str, filepath: Path) -> bool:
+        """Download file."""
+        response = self.graph.make_request(url, "download attachment", timeout=120)
+        if response and response.status_code == 200:
+            with open(filepath, 'wb') as f:
+                f.write(response.content)
+            return True
+        return False
+    
+    def _get_ext_from_url(self, url: str) -> Optional[str]:
+        """Get extension from URL."""
+        path = urlparse(url).path
+        ext = Path(path).suffix
+        return ext.lstrip('.') if ext else None
+    
+    def _html_to_markdown(self, html_content: str) -> str:
+        """Convert HTML to Markdown."""
+        md = html_content
+        md = re.sub(r'<h1[^>]*>(.*?)</h1>', r'# \1\n', md, flags=re.DOTALL)
+        md = re.sub(r'<h2[^>]*>(.*?)</h2>', r'## \1\n', md, flags=re.DOTALL)
+        md = re.sub(r'<h3[^>]*>(.*?)</h3>', r'### \1\n', md, flags=re.DOTALL)
+        md = re.sub(r'<strong[^>]*>(.*?)</strong>', r'**\1**', md, flags=re.DOTALL)
+        md = re.sub(r'<em[^>]*>(.*?)</em>', r'*\1*', md, flags=re.DOTALL)
+        md = re.sub(r'<a[^>]*href="([^"]+)"[^>]*>(.*?)</a>', r'[\2](\1)', md, flags=re.DOTALL)
+        md = re.sub(r'<[^>]+>', '', md)
+        md = re.sub(r'\n\s*\n\s*\n', '\n\n', md)
+        return html.unescape(md).strip()
+    
+    def _export_joplin(self, folder: Path, title: str, content: str, metadata: Dict):
+        """Export as Joplin Markdown."""
+        joplin_dir = folder / 'joplin' if folder.name != self.sanitize_filename(title) else folder
+        joplin_dir.mkdir(exist_ok=True)
+        
+        md_content = self._html_to_markdown(content)
+        filepath = joplin_dir / f"{self.sanitize_filename(title)}.md"
+        
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(f"# {title}\n\n")
+            f.write(f"Created: {metadata['created']}\n")
+            f.write(f"Modified: {metadata['modified']}\n\n")
+            f.write(md_content)
+    
+    def _export_enex(self, folder: Path, title: str, content: str, 
+                    attachments: List, metadata: Dict):
+        """Export as Evernote ENEX."""
+        enex_dir = folder / 'evernote' if folder.name != self.sanitize_filename(title) else folder
+        enex_dir.mkdir(exist_ok=True)
+        
+        filepath = enex_dir / f"{self.sanitize_filename(title)}.enex"
+        escaped_content = html.escape(content)
+        
+        enex = f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-export SYSTEM "http://xml.evernote.com/pub/evernote-export3.dtd">
+<en-export export-date="{datetime.now().strftime('%Y%m%dT%H%M%SZ')}" application="OneNote Exporter" version="{VERSION}">
+  <note>
+    <title>{html.escape(title)}</title>
+    <content><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
+<en-note>{escaped_content}</en-note>]]></content>
+    <created>{metadata['created']}</created>
+    <updated>{metadata['modified']}</updated>
+  </note>
+</en-export>"""
+        
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(enex)
+    
+    def _save_export_summary(self):
+        """Save export_summary.json."""
+        preflight = self.preflight_data.get('totals', {})
+        
+        summary = {
+            'version': VERSION,
+            'timestamp': datetime.now().isoformat(),
+            'account': self.user_info,
+            'tenant': self.graph.tenant_id,
+            'scope': self.preflight_data.get('scope', 'Unknown'),
+            'preflight_totals': preflight,
+            'export_stats': self.stats,
+            'export_path': str(self.export_root),
+            'api_requests': self.graph.request_count,
+            'api_errors': self.graph.error_count,
+            'skipped_items': self.skipped_items,
+            'export_errors': self.export_errors[:100]  # Limit size
+        }
+        
+        save_json(self.export_root / 'export_summary.json', summary)
+    
+    def print_final_summary(self, no_pause: bool = False):
+        """Print final summary and wait."""
+        preflight = self.preflight_data.get('totals', {})
+        
+        print("\n" + "=" * 70)
+        print("📊 EXPORT COMPLETE - FINAL SUMMARY")
+        print("=" * 70)
+        print(f"\n{'Metric':<25} {'Preflight':<15} {'Exported':<15}")
+        print("-" * 55)
+        print(f"{'Notebooks':<25} {preflight.get('notebooks', 0):<15} {self.stats['notebooks']:<15}")
+        print(f"{'Section Groups':<25} {preflight.get('section_groups', 0):<15} {self.stats['section_groups']:<15}")
+        print(f"{'Sections':<25} {preflight.get('sections', 0):<15} {self.stats['sections']:<15}")
+        print(f"{'Pages':<25} {preflight.get('pages', 0):<15} {self.stats['pages']:<15}")
+        print(f"{'  (Child Pages)':<25} {'-':<15} {self.stats['child_pages']:<15}")
+        print("-" * 55)
+        print(f"{'Images':<25} {'-':<15} {self.stats['images']:<15}")
+        print(f"{'Errors':<25} {'-':<15} {self.stats['errors']:<15}")
+        print(f"{'API Requests':<25} {'-':<15} {self.graph.request_count:<15}")
+        
+        # Match check
+        pages_match = preflight.get('pages', 0) == self.stats['pages']
+        if pages_match:
+            print(f"\n✅ Export totals match preflight scan!")
+        else:
+            diff = preflight.get('pages', 0) - self.stats['pages']
+            print(f"\n⚠️  Page count mismatch: expected {preflight.get('pages', 0)}, got {self.stats['pages']} (diff: {diff})")
+        
+        print(f"\n📂 Export location: {self.export_root}")
+        print(f"📄 Files: index.md, index.json, export_summary.json, run.log")
+        
+        if self.export_errors:
+            print(f"❌ {len(self.export_errors)} export errors - see export_summary.json")
+        
+        print("=" * 70)
+        
+        if not no_pause:
+            input("\nPress Enter to exit...")
 
 
+# ============================================================================
+# Main Entry Point
+# ============================================================================
 def main():
-    print("="*70)
-    print("OneNote Export Tool")
-    print("Export OneNote notebooks with attachments for Evernote, Joplin, etc.")
-    print("="*70)
+    parser = argparse.ArgumentParser(description=f'OneNote Export Tool v{VERSION}')
+    parser.add_argument('--preflight-only', action='store_true',
+                        help='Only run preflight scan, no export')
+    parser.add_argument('--no-pause', action='store_true',
+                        help='Exit immediately (no Press Enter prompt)')
+    parser.add_argument('--settings', type=str, default='settings.json',
+                        help='Settings file path')
+    parser.add_argument('--output', type=str,
+                        help='Output directory')
+    args = parser.parse_args()
     
-    exporter = OneNoteExporter()
+    print("=" * 70)
+    print(f"OneNote Export Tool v{VERSION}")
+    print("Interactive selection • Robust retry • Page hierarchy • File logging")
+    print("=" * 70)
+    
+    # Load settings
+    script_dir = Path(__file__).parent
+    settings_path = script_dir / args.settings
+    settings = load_settings(settings_path)
+    
+    if settings:
+        logger.info(f"✓ Loaded settings from {settings_path}")
+    
+    exporter = OneNoteExporter(settings)
     
     # Authenticate
     if not exporter.authenticate():
-        print("\n❌ Authentication failed. Exiting.")
+        logger.error("Authentication failed")
+        if not args.no_pause:
+            input("\nPress Enter to exit...")
+        sys.exit(1)
+    
+    # Interactive selection
+    if not exporter.select_export_scope():
+        logger.error("Selection failed")
+        if not args.no_pause:
+            input("\nPress Enter to exit...")
+        sys.exit(1)
+    
+    # Output path
+    output_path = args.output or exporter.output_root
+    if not output_path:
+        print("\n📁 Where would you like to save the export?")
+        output_path = input("Enter path (e.g., C:/OneNote-Exports): ").strip()
+        if not output_path:
+            output_path = str(Path.home() / "Desktop")
+            print(f"Using default: {output_path}")
+    
+    # Preflight only
+    if args.preflight_only:
+        output_dir = Path(output_path) / f"OneNote_Preflight_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        logger.set_log_file(output_dir / 'run.log')
+        
+        exporter.run_preflight()
+        exporter.write_index_files(output_dir)
+        
+        logger.info(f"\n✅ Preflight complete!")
+        logger.info(f"📂 Files: {output_dir}")
+        
+        if not args.no_pause:
+            input("\nPress Enter to exit...")
         return
     
-    # Get destination
-    print("\n📁 Where would you like to save the export?")
-    destination = input("Enter path (e.g., /Users/yourname/Desktop): ").strip()
+    # Format selection
+    if not exporter.export_format:
+        print("\n📝 Export format:")
+        print("1. Joplin (Markdown)")
+        print("2. Evernote (ENEX)")
+        print("3. Both")
+        print("4. Raw HTML only")
+        choice = input("Enter choice [1]: ").strip() or '1'
+        exporter.export_format = {'1': 'joplin', '2': 'enex', '3': 'both', '4': 'raw_html'}.get(choice, 'joplin')
     
-    if not destination:
-        destination = str(Path.home() / "Desktop")
-        print(f"Using default: {destination}")
-    
-    # Choose export format
-    print("\n📝 Export format:")
-    print("1. Both Joplin (Markdown) and Evernote (ENEX)")
-    print("2. Joplin only")
-    print("3. Evernote only")
-    print("4. Raw HTML only")
-    
-    choice = input("Enter choice (1-4): ").strip()
-    
-    format_map = {
-        '1': ['both'],
-        '2': ['joplin'],
-        '3': ['evernote'],
-        '4': []
-    }
-    
-    export_formats = format_map.get(choice, ['both'])
-    
-    # Start export
-    print("\n🚀 Starting export...")
-    print("This may take a while for large notebooks...\n")
-    
-    success = exporter.export_all(destination, export_formats)
-    
-    if success:
-        print("\n✅ Export complete!")
-        print(f"\n📂 Your exported notebooks are ready at:")
-        print(f"   {exporter.export_root}")
-        print(f"\n📖 Read the README.md file for import instructions")
-    else:
-        print("\n⚠️  Export completed with errors. Check the output above.")
+    logger.info(f"\n🚀 Starting export (format: {exporter.export_format})...")
+    exporter.export_all(output_path)
+    exporter.print_final_summary(args.no_pause)
 
 
 if __name__ == "__main__":

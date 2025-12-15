@@ -1,0 +1,12 @@
+{
+  "auth": {
+    "client_id": "YOUR_CLIENT_ID_HERE",
+    "tenant": "consumers"
+  },
+  "export": {
+    "output_root": "C:/OneNote-Exports",
+    "format": "joplin",
+    "include_notebooks": [],
+    "exclude_notebooks": []
+  }
+}
