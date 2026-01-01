@@ -25,6 +25,9 @@ import getpass
 import time
 import random
 import logging
+import threading
+import socket
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from datetime import datetime
 from urllib.parse import urlparse, parse_qs
@@ -114,17 +117,72 @@ logger = FileAndConsoleLogger()
 # ============================================================================
 # Settings
 # ============================================================================
+def get_settings_path() -> Path:
+    """Get settings.json path - checks multiple locations in order."""
+    # When running as PyInstaller exe, sys.executable is the exe path
+    if getattr(sys, 'frozen', False):
+        exe_dir = Path(sys.executable).parent
+        exe_settings = exe_dir / 'settings.json'
+        if exe_settings.exists():
+            return exe_settings
+    
+    # Check script directory first (onenote-exporter/)
+    script_dir = Path(__file__).parent
+    script_settings = script_dir / 'settings.json'
+    if script_settings.exists():
+        return script_settings
+    
+    # Check parent directory (project root)
+    parent_settings = script_dir.parent / 'settings.json'
+    if parent_settings.exists():
+        return parent_settings
+    
+    # Default to script directory for new file creation
+    return script_settings
+
+
+def save_settings(settings_path: Path, client_id: str, client_secret: str, 
+                  export_folder: str, tenant: str = 'consumers'):
+    """Save settings to JSON file in flat format."""
+    settings = {
+        "application_client_id": client_id,
+        "client_secret_value": client_secret,
+        "export_folder": export_folder,
+        "tenant": tenant
+    }
+    with open(settings_path, 'w', encoding='utf-8') as f:
+        json.dump(settings, f, indent=4)
+    logger.info(f"✓ Settings saved to {settings_path}")
+
+
 def load_settings(settings_path: Path) -> Dict[str, Any]:
-    """Load settings from JSON file. Never loads client_secret."""
+    """Load settings from JSON file. Supports both flat and nested formats."""
     if not settings_path.exists():
         return {}
     try:
         with open(settings_path, 'r', encoding='utf-8') as f:
-            settings = json.load(f)
-        # SECURITY: Never load client_secret from file
-        if 'auth' in settings and 'client_secret' in settings.get('auth', {}):
-            del settings['auth']['client_secret']
-        return settings
+            raw_settings = json.load(f)
+        
+        # Check if using new flat format (application_client_id, client_secret_value, export_folder)
+        if 'application_client_id' in raw_settings:
+            # Convert flat format to nested format used internally
+            settings = {
+                'auth': {
+                    'client_id': raw_settings.get('application_client_id'),
+                    'client_secret': raw_settings.get('client_secret_value'),
+                    'tenant': raw_settings.get('tenant', 'consumers')
+                },
+                'export': {
+                    'output_root': raw_settings.get('export_folder'),
+                    'format': raw_settings.get('format', 'joplin')
+                }
+            }
+            return settings
+        
+        # Legacy nested format - still supported but client_secret not loaded for security
+        if 'auth' in raw_settings and 'client_secret' in raw_settings.get('auth', {}):
+            del raw_settings['auth']['client_secret']
+        return raw_settings
     except Exception as e:
         logger.warning(f"Could not load settings.json: {e}")
         return {}
@@ -324,8 +382,9 @@ class GraphClient:
 class OneNoteExporter:
     """Main exporter class with interactive selection and robust handling."""
     
-    def __init__(self, settings: Dict[str, Any] = None):
+    def __init__(self, settings: Dict[str, Any] = None, settings_path: Path = None):
         self.settings = settings or {}
+        self.settings_path = settings_path  # For saving new settings
         self.graph = GraphClient(
             max_retries=self.settings.get('export', {}).get('max_retries', DEFAULT_MAX_RETRIES)
         )
@@ -349,9 +408,13 @@ class OneNoteExporter:
             'orphans': 0
         }
         
+        # Track if settings were loaded from file
+        self._settings_from_file = bool(settings)
+        
         # Load settings
         auth_settings = self.settings.get('auth', {})
         self.graph.client_id = auth_settings.get('client_id')
+        self.graph.client_secret = auth_settings.get('client_secret')  # From settings.json if present
         self.graph.tenant_id = auth_settings.get('tenant', 'consumers')
         
         export_settings = self.settings.get('export', {})
@@ -369,14 +432,12 @@ class OneNoteExporter:
         print(f"OneNote Export Tool v{VERSION} - Authentication")
         print("=" * 70)
         
+        settings_changed = False
+        
         # Check for client_id from settings
         if self.graph.client_id:
             logger.info(f"✓ Client ID loaded from settings.json")
-            use_saved = input(f"  Use client ID '{self.graph.client_id[:8]}...'? [Y/n]: ").strip().lower()
-            if use_saved == 'n':
-                self.graph.client_id = None
-        
-        if not self.graph.client_id:
+        else:
             print("\n📋 You need a Microsoft App Registration to use this tool.")
             print("\nQuick Setup:")
             print("1. Go to: https://entra.microsoft.com/")
@@ -385,14 +446,19 @@ class OneNoteExporter:
             print("4. Add API permissions: Notes.Read, Notes.Read.All, User.Read")
             print("=" * 70 + "\n")
             self.graph.client_id = input("Enter Application (client) ID: ").strip()
+            settings_changed = True
         
-        # Client secret - check env var first, then prompt
-        self.graph.client_secret = os.environ.get('ONENOTE_CLIENT_SECRET')
+        # Client secret - check settings first, then env var, then prompt
         if self.graph.client_secret:
-            logger.info("✓ Client secret loaded from ONENOTE_CLIENT_SECRET env var")
+            logger.info("✓ Client secret loaded from settings.json")
         else:
-            print("\n🔐 Client secret required (never stored on disk)")
-            self.graph.client_secret = getpass.getpass("Enter Client Secret (hidden): ")
+            self.graph.client_secret = os.environ.get('ONENOTE_CLIENT_SECRET')
+            if self.graph.client_secret:
+                logger.info("✓ Client secret loaded from ONENOTE_CLIENT_SECRET env var")
+            else:
+                print("\n🔐 Client secret required")
+                self.graph.client_secret = getpass.getpass("Enter Client Secret (hidden): ")
+                settings_changed = True
         
         if not self.graph.client_secret:
             logger.error("Client secret is required")
@@ -401,11 +467,149 @@ class OneNoteExporter:
         # Tenant
         if not self.graph.tenant_id:
             self.graph.tenant_id = input("Enter Tenant ID [consumers]: ").strip() or 'consumers'
+            settings_changed = True
+        
+        # Export folder - check if we need to prompt
+        if not self.output_root:
+            print("\n📁 Where would you like to save exports?")
+            self.output_root = input("Enter export folder path (e.g., C:\\OneNote-Exports): ").strip()
+            if not self.output_root:
+                self.output_root = str(Path.home() / "OneNote-Exports")
+                print(f"Using default: {self.output_root}")
+            settings_changed = True
+        else:
+            logger.info(f"✓ Export folder: {self.output_root}")
+        
+        # Save settings if anything was entered manually
+        if settings_changed and self.settings_path:
+            save_choice = input("\n💾 Save these settings for next time? [Y/n]: ").strip().lower()
+            if save_choice != 'n':
+                save_settings(
+                    self.settings_path,
+                    self.graph.client_id,
+                    self.graph.client_secret,
+                    self.output_root,
+                    self.graph.tenant_id
+                )
         
         return self._delegated_auth_flow()
     
+    def _capture_oauth_callback(self, auth_url: str, port: int = 8080, timeout: int = 120) -> Optional[str]:
+        """
+        Start a temporary local HTTP server to capture the OAuth callback.
+        Returns the authorization code or None if capture failed.
+        """
+        captured_code = {'code': None, 'error': None}
+        server_ready = threading.Event()
+        
+        class CallbackHandler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                """Handle the OAuth callback."""
+                parsed = urlparse(self.path)
+                params = parse_qs(parsed.query)
+                
+                if 'code' in params:
+                    captured_code['code'] = params['code'][0]
+                    # Send a nice success page
+                    self.send_response(200)
+                    self.send_header('Content-type', 'text/html')
+                    self.end_headers()
+                    success_html = '''
+                    <!DOCTYPE html>
+                    <html>
+                    <head><title>Authentication Successful</title></head>
+                    <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+                        <h1 style="color: #28a745;">✅ Authentication Successful!</h1>
+                        <p>You can close this browser tab and return to the application.</p>
+                    </body>
+                    </html>
+                    '''
+                    self.wfile.write(success_html.encode())
+                elif 'error' in params:
+                    captured_code['error'] = params.get('error_description', params.get('error', ['Unknown error']))[0]
+                    self.send_response(400)
+                    self.send_header('Content-type', 'text/html')
+                    self.end_headers()
+                    error_html = f'''
+                    <!DOCTYPE html>
+                    <html>
+                    <head><title>Authentication Failed</title></head>
+                    <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+                        <h1 style="color: #dc3545;">❌ Authentication Failed</h1>
+                        <p>{captured_code['error']}</p>
+                    </body>
+                    </html>
+                    '''
+                    self.wfile.write(error_html.encode())
+                else:
+                    self.send_response(404)
+                    self.end_headers()
+            
+            def log_message(self, format, *args):
+                # Suppress HTTP server logging
+                pass
+        
+        def run_server():
+            try:
+                server = HTTPServer(('localhost', port), CallbackHandler)
+                server.timeout = 1  # Check for shutdown every second
+                server_ready.set()
+                
+                start_time = time.time()
+                while time.time() - start_time < timeout:
+                    server.handle_request()
+                    if captured_code['code'] or captured_code['error']:
+                        break
+                server.server_close()
+            except Exception as e:
+                captured_code['error'] = str(e)
+                server_ready.set()
+        
+        # Check if port is available
+        try:
+            test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            test_socket.settimeout(1)
+            result = test_socket.connect_ex(('localhost', port))
+            test_socket.close()
+            if result == 0:
+                # Port is in use
+                logger.warning(f"Port {port} is in use. Falling back to manual URL paste.")
+                return None
+        except Exception:
+            pass
+        
+        # Start server in background thread
+        server_thread = threading.Thread(target=run_server, daemon=True)
+        server_thread.start()
+        
+        # Wait for server to be ready
+        if not server_ready.wait(timeout=5):
+            logger.warning("Could not start callback server. Falling back to manual URL paste.")
+            return None
+        
+        print(f"🌐 Listening on http://localhost:{port} for OAuth callback...")
+        print("Opening browser for authentication...")
+        webbrowser.open(auth_url)
+        
+        print(f"\n⏳ Waiting for authentication (timeout: {timeout}s)...")
+        print("   Complete the sign-in in your browser.\n")
+        
+        # Wait for callback
+        server_thread.join(timeout=timeout)
+        
+        if captured_code['error']:
+            logger.error(f"OAuth error: {captured_code['error']}")
+            return None
+        
+        if captured_code['code']:
+            logger.info("✅ Authorization code captured automatically!")
+            return captured_code['code']
+        
+        logger.warning("Timeout waiting for OAuth callback.")
+        return None
+
     def _delegated_auth_flow(self) -> bool:
-        """Interactive OAuth flow."""
+        """Interactive OAuth flow with automatic callback capture."""
         logger.info("\n🔐 Starting authentication...")
         
         redirect_uri = "http://localhost:8080"
@@ -418,19 +622,21 @@ class OneNoteExporter:
             f"&scope={scope}"
         )
         
-        print("Opening browser for authentication...")
-        webbrowser.open(auth_url)
+        # Try to start local server to capture callback automatically
+        code = self._capture_oauth_callback(auth_url)
         
-        print("\nAfter signing in, copy the full URL from your browser.")
-        print("(It will show an error page, but that's normal)")
-        redirect_response = input("\nPaste the redirect URL here: ").strip()
-        
-        try:
-            parsed = urlparse(redirect_response)
-            code = parse_qs(parsed.query)['code'][0]
-        except Exception:
-            logger.error("Could not extract authorization code from URL")
-            return False
+        if not code:
+            # Fallback to manual paste if server failed
+            print("\nAfter signing in, copy the full URL from your browser.")
+            print("(It will show an error page, but that's normal)")
+            redirect_response = input("\nPaste the redirect URL here: ").strip()
+            
+            try:
+                parsed = urlparse(redirect_response)
+                code = parse_qs(parsed.query)['code'][0]
+            except Exception:
+                logger.error("Could not extract authorization code from URL")
+                return False
         
         token_url = f"https://login.microsoftonline.com/{self.graph.tenant_id}/oauth2/v2.0/token"
         data = {
@@ -1409,9 +1615,12 @@ class OneNoteExporter:
         created = metadata.get('created', '')
         modified = metadata.get('modified', '')
         
+        # Escape quotes in title for YAML
+        escaped_title = title.replace('"', '\\"')
+        
         # Build YAML front matter (compatible with Obsidian, Joplin, etc.)
         front_matter = f"""---
-title: "{title.replace('"', '\\"')}"
+title: "{escaped_title}"
 created: {created}
 modified: {modified}
 tags: [onenote-export]
@@ -1520,7 +1729,7 @@ def main():
     parser.add_argument('--settings', type=str, default='settings.json',
                         help='Settings file path')
     parser.add_argument('--output', type=str,
-                        help='Output directory')
+                        help='Output directory (overrides settings.json)')
     args = parser.parse_args()
     
     print("=" * 70)
@@ -1528,17 +1737,29 @@ def main():
     print("Interactive selection • Robust retry • Page hierarchy • File logging")
     print("=" * 70)
     
-    # Load settings
-    script_dir = Path(__file__).parent
-    settings_path = script_dir / args.settings
+    # Load settings - check exe directory first (for distributed exe), then script dir, then parent
+    if args.settings != 'settings.json':
+        # User specified a custom path
+        settings_path = Path(args.settings)
+    else:
+        # Use automatic detection
+        settings_path = get_settings_path()
+    
     settings = load_settings(settings_path)
     
     if settings:
         logger.info(f"✓ Loaded settings from {settings_path}")
+    else:
+        logger.info(f"ℹ️ No settings file found - will prompt for configuration")
     
-    exporter = OneNoteExporter(settings)
+    # Pass settings_path so exporter can save new settings if needed
+    exporter = OneNoteExporter(settings, settings_path=settings_path)
     
-    # Authenticate
+    # Command-line output overrides settings
+    if args.output:
+        exporter.output_root = args.output
+    
+    # Authenticate (this will prompt for missing settings and offer to save)
     if not exporter.authenticate():
         logger.error("Authentication failed")
         if not args.no_pause:
@@ -1552,14 +1773,8 @@ def main():
             input("\nPress Enter to exit...")
         sys.exit(1)
     
-    # Output path
-    output_path = args.output or exporter.output_root
-    if not output_path:
-        print("\n📁 Where would you like to save the export?")
-        output_path = input("Enter path (e.g., C:/OneNote-Exports): ").strip()
-        if not output_path:
-            output_path = str(Path.home() / "Desktop")
-            print(f"Using default: {output_path}")
+    # Output path - should already be set from settings or authenticate()
+    output_path = exporter.output_root
     
     # Preflight only
     if args.preflight_only:

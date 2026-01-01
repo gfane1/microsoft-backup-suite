@@ -117,6 +117,10 @@ client_secret.json
 config.ini
 .env.local
 
+# Settings file with credentials (root and dist)
+settings.json
+dist/settings.json
+
 # OneNote Exporter settings (contains client_id, may contain sensitive paths)
 onenote-exporter/settings.json
 

@@ -89,6 +89,29 @@ class TestLoadSettings(unittest.TestCase):
                 Path(temp_path).unlink()
             except PermissionError:
                 pass  # Windows file locking - ignore
+    
+    def test_load_settings_flat_format(self):
+        """Should convert flat format (application_client_id, etc.) to nested format."""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            json.dump({
+                "application_client_id": "my-app-id",
+                "client_secret_value": "my-secret",
+                "export_folder": "c:\\MyExports"
+            }, f)
+            temp_path = f.name
+        
+        try:
+            result = load_settings(Path(temp_path))
+            
+            # Should be converted to nested format
+            self.assertEqual(result['auth']['client_id'], 'my-app-id')
+            self.assertEqual(result['auth']['client_secret'], 'my-secret')
+            self.assertEqual(result['export']['output_root'], 'c:\\MyExports')
+        finally:
+            try:
+                Path(temp_path).unlink()
+            except PermissionError:
+                pass  # Windows file locking - ignore
 
 
 class TestGraphClient(unittest.TestCase):

@@ -103,6 +103,15 @@ def main():
         executables_found.append(dest)
         print(f"✅ Copied: {dest}")
     
+    # Copy settings.json if it exists in root
+    settings_file = base_dir / "settings.json"
+    if settings_file.exists():
+        dest = combined_dist / "settings.json"
+        shutil.copy2(settings_file, dest)
+        print(f"✅ Copied: {dest} (credentials)")
+    else:
+        print(f"ℹ️ No settings.json found in root - skipping credentials copy")
+    
     # Summary
     print(f"\n{'='*60}")
     print("BUILD COMPLETE!")
