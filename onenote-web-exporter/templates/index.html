@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OneNote Web Exporter</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <span class="logo">📓</span>
+            <span>OneNote Web Exporter</span>
+        </div>
+        <div class="nav-links">
+            <a href="{{ url_for('index') }}" class="active">Home</a>
+            <a href="{{ url_for('browse_page') }}">Browse</a>
+            <a href="{{ url_for('settings_page') }}">Settings</a>
+        </div>
+        <div class="nav-auth">
+            {% if is_authenticated %}
+            <span class="auth-status authenticated">✓ Connected</span>
+            <a href="{{ url_for('auth_logout') }}" class="btn btn-small">Logout</a>
+            {% else %}
+            <span class="auth-status">Not connected</span>
+            {% endif %}
+        </div>
+    </nav>
+
+    <main class="container">
+        <div class="hero">
+            <h1>📓 OneNote Web Exporter</h1>
+            <p class="subtitle">Export your OneNote notebooks to Joplin-compatible Markdown</p>
+        </div>
+
+        {% if not has_settings %}
+        <div class="card warning">
+            <h2>⚙️ Setup Required</h2>
+            <p>You need to configure your Microsoft Azure app credentials to use this tool.</p>
+            <a href="{{ url_for('settings_page') }}" class="btn btn-primary">Configure Settings</a>
+        </div>
+        {% elif not is_authenticated %}
+        <div class="card">
+            <h2>🔐 Sign In</h2>
+            <p>Connect to your Microsoft account to access your OneNote notebooks.</p>
+            <a href="{{ url_for('auth_login') }}" class="btn btn-primary">Sign in with Microsoft</a>
+        </div>
+        {% else %}
+        <div class="dashboard">
+            <div class="card">
+                <h2>📚 Browse Notebooks</h2>
+                <p>Explore your OneNote notebooks, sections, and pages. Select items to export.</p>
+                <a href="{{ url_for('browse_page') }}" class="btn btn-primary">Browse Notebooks</a>
+            </div>
+            
+            <div class="card">
+                <h2>📁 Export Location</h2>
+                <p class="export-path">{{ export_folder }}</p>
+                <a href="{{ url_for('settings_page') }}" class="btn btn-secondary">Change</a>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>📋 Recent Exports</h2>
+            <div id="recent-exports">
+                <p class="loading">Loading...</p>
+            </div>
+        </div>
+        {% endif %}
+    </main>
+
+    <footer>
+        <p>OneNote Web Exporter &copy; 2025 | Part of Microsoft Backup Suite</p>
+    </footer>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+    <script>
+        // Load recent exports on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const exportsDiv = document.getElementById('recent-exports');
+            if (exportsDiv) {
+                fetch('/api/exports')
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.exports && data.exports.length > 0) {
+                            let html = '<ul class="export-list">';
+                            data.exports.slice(0, 5).forEach(exp => {
+                                const stats = exp.stats || {};
+                                html += `<li>
+                                    <strong>${exp.name}</strong>
+                                    <span class="meta">${stats.pages || 0} pages, ${stats.images || 0} images</span>
+                                    <span class="date">${new Date(exp.created).toLocaleDateString()}</span>
+                                </li>`;
+                            });
+                            html += '</ul>';
+                            exportsDiv.innerHTML = html;
+                        } else {
+                            exportsDiv.innerHTML = '<p class="empty">No exports yet</p>';
+                        }
+                    })
+                    .catch(err => {
+                        exportsDiv.innerHTML = '<p class="error">Failed to load exports</p>';
+                    });
+            }
+        });
+    </script>
+</body>
+</html>

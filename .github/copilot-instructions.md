@@ -2,16 +2,17 @@
 
 ## Project Overview
 
-This repository contains two Python tools for backing up Microsoft personal data:
+This repository contains three Python tools for backing up Microsoft personal data:
 
 1. **OneDrive Backup Tool** (`onedrive-backup/`) - Backs up OneDrive files to local storage
-2. **OneNote Exporter** (`onenote-exporter/`) - Exports OneNote notebooks to Markdown/ENEX/HTML
+2. **OneNote Exporter CLI** (`onenote-exporter/`) - Command-line tool to export OneNote notebooks to Markdown/ENEX/HTML
+3. **OneNote Web Exporter** (`onenote-web-exporter/`) - Web-based UI for exploring and exporting OneNote notebooks
 
-Both tools use the Microsoft Graph API with OAuth 2.0 authentication for personal Microsoft accounts.
+All tools use the Microsoft Graph API with OAuth 2.0 authentication for personal Microsoft accounts.
 
 ## Architecture
 
-### OneNote Exporter (Primary Focus)
+### OneNote CLI Exporter
 
 ```
 onenote_exporter.py      # Main entry point, CLI interface, orchestration
@@ -20,6 +21,22 @@ test_onenote_exporter.py # Unit tests for main exporter
 test_index_builder.py    # Unit tests for index builder (81 tests)
 ```
 
+### OneNote Web Exporter
+
+```
+app.py                   # Flask web application, routes, SSE streaming
+graph_client.py          # Microsoft Graph API client with OAuth
+exporter.py              # Export logic with progress callbacks
+templates/               # Jinja2 HTML templates
+static/                  # CSS and JavaScript assets
+```
+
+**Key Features:**
+- Web-based UI for browsing notebooks, sections, and pages
+- Real-time export progress via Server-Sent Events (SSE)
+- Exports to Joplin-compatible Markdown with linked images
+- Runs locally on http://localhost:8080
+
 **Key Classes:**
 - `FileAndConsoleLogger` - Dual logging (file + console)
 - `GraphClient` - Microsoft Graph API wrapper with retry logic
@@ -27,6 +44,12 @@ test_index_builder.py    # Unit tests for index builder (81 tests)
 - `PageTreeBuilder` - Builds parent-child hierarchy from page levels
 - `FilesystemLayoutPlanner` - Plans folder structure for export
 - `IndexGenerator` - Generates index.md and index.json
+
+**Web Exporter Key Classes:**
+- `GraphClient` (web) - Simplified Graph API client for web context
+- `OneNoteExporter` (web) - Export orchestration with progress generators
+- `ExportProgress` - Dataclass for SSE progress updates
+- Flask routes handle authentication, browsing, and export streaming
 
 ### Key Technical Details
 

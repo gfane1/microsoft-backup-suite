@@ -1,0 +1,2123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Browse Notebooks - OneNote Web Exporter</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        /* Three-panel layout */
+        .panels-container {
+            display: flex;
+            height: calc(100vh - 80px);
+            gap: 0;
+            padding: 0;
+            background: #e0e0e0;
+        }
+        
+        /* Panel base styles */
+        .panel {
+            background: white;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border-right: 1px solid #ccc;
+        }
+        .panel:last-child {
+            border-right: none;
+        }
+        .panel-header {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(to bottom, #f8f9fa, #f0f0f0);
+            min-height: 50px;
+        }
+        .panel-header h2 {
+            margin: 0;
+            font-size: 0.95rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            color: #333;
+        }
+        .panel-content {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+        .panel-footer {
+            padding: 0.5rem 1rem;
+            border-top: 1px solid #ddd;
+            background: #f8f9fa;
+            font-size: 0.8rem;
+        }
+        
+        /* Left panel - Notebooks */
+        .notebooks-panel {
+            width: 340px;
+            min-width: 280px;
+        }
+        
+        /* Middle panel - Export folder */
+        .export-panel {
+            width: 340px;
+            min-width: 280px;
+        }
+        
+        /* Right panel - Preview */
+        .preview-panel {
+            flex: 1;
+            min-width: 300px;
+        }
+        
+        /* Toolbar styles */
+        .toolbar {
+            display: flex;
+            gap: 0.3rem;
+            align-items: center;
+        }
+        .toolbar-btn {
+            padding: 0.3rem 0.5rem;
+            border: 1px solid #ccc;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 0.2rem;
+        }
+        .toolbar-btn:hover {
+            background: #f0f0f0;
+        }
+        .toolbar-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .toolbar-btn.primary {
+            background: #7719aa;
+            color: white;
+            border-color: #7719aa;
+        }
+        .toolbar-btn.primary:hover {
+            background: #5c1385;
+        }
+        
+        /* Tree view styles */
+        .tree-view {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 0.85rem;
+            padding: 0.25rem;
+        }
+        .tree-item {
+            user-select: none;
+        }
+        .tree-row {
+            display: flex;
+            align-items: center;
+            padding: 0.35rem 0.5rem;
+            border-radius: 3px;
+            cursor: pointer;
+            gap: 0.3rem;
+        }
+        .tree-row:hover {
+            background: #f5f5f5;
+        }
+        .tree-row.selected {
+            background: #e8e0f0;
+        }
+        .tree-toggle {
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            font-size: 0.65rem;
+            flex-shrink: 0;
+        }
+        .tree-toggle.empty {
+            visibility: hidden;
+        }
+        .tree-checkbox {
+            width: 14px;
+            height: 14px;
+            cursor: pointer;
+            flex-shrink: 0;
+            accent-color: #7719aa;
+        }
+        .tree-icon {
+            font-size: 0.9rem;
+            flex-shrink: 0;
+            width: 18px;
+            text-align: center;
+        }
+        .tree-name {
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .tree-badge {
+            background: #7719aa;
+            color: white;
+            padding: 0.1rem 0.35rem;
+            border-radius: 8px;
+            font-size: 0.65rem;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+        .tree-badge.loading {
+            background: #aaa;
+        }
+        .tree-badge.cached {
+            background: #28a745;
+        }
+        .tree-children {
+            margin-left: 0.75rem;
+            border-left: 1px solid #e0e0e0;
+            display: none;
+        }
+        .tree-children.expanded {
+            display: block;
+        }
+        .tree-loading {
+            padding: 0.5rem 1rem;
+            color: #888;
+            font-style: italic;
+            font-size: 0.8rem;
+        }
+        
+        /* Page level indicators */
+        .page-level {
+            font-size: 0.6rem;
+            color: #888;
+            background: #eee;
+            padding: 0.1rem 0.25rem;
+            border-radius: 3px;
+        }
+        
+        /* Export file tree - same style as notebook tree */
+        .export-tree {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 0.85rem;
+            padding: 0.25rem;
+            background: white;
+        }
+        .export-tree .tree-item {
+            user-select: none;
+        }
+        .export-tree .tree-row {
+            display: flex;
+            align-items: center;
+            padding: 0.35rem 0.5rem;
+            border-radius: 3px;
+            cursor: pointer;
+            gap: 0.3rem;
+        }
+        .export-tree .tree-row:hover {
+            background: #f5f5f5;
+        }
+        .export-tree .tree-row.selected {
+            background: #e8e0f0;
+        }
+        .export-tree .tree-row.not-created {
+            color: #999;
+        }
+        .export-tree .tree-row.created {
+            color: #333;
+        }
+        .export-tree .tree-row.created .exported-check {
+            color: #28a745;
+            margin-left: auto;
+            font-weight: bold;
+        }
+        .export-tree .tree-children {
+            margin-left: 0.75rem;
+            border-left: 1px solid #e0e0e0;
+            display: none;
+        }
+        .export-tree .tree-children.expanded {
+            display: block;
+        }
+        .export-empty {
+            text-align: center;
+            padding: 2rem;
+            color: #888;
+        }
+        
+        /* Preview panel */
+        .preview-content {
+            padding: 1rem;
+            height: 100%;
+            overflow: auto;
+        }
+        .preview-empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #888;
+            text-align: center;
+        }
+        .preview-empty p {
+            margin: 0.25rem 0;
+        }
+        .preview-md {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 1rem;
+            font-family: 'Consolas', monospace;
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+            overflow: auto;
+            height: 100%;
+            box-sizing: border-box;
+        }
+        .preview-html {
+            background: white;
+            padding: 1rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            overflow: auto;
+            height: 100%;
+            box-sizing: border-box;
+        }
+        .preview-html img {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        /* Export progress modal */
+        .export-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .export-modal-content {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            width: 650px;
+            min-width: 400px;
+            max-width: 95vw;
+            max-height: 90vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            resize: both;
+        }
+        .export-modal-content.expanded {
+            width: 90vw;
+            height: 85vh;
+        }
+        .export-modal h3 {
+            margin: 0 0 1rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .export-progress-bar {
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 1rem 0;
+        }
+        .export-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #7719aa, #9b4dca);
+            transition: width 0.3s ease;
+        }
+        .export-log {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 0.75rem;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            flex: 1;
+            min-height: 150px;
+            overflow-y: auto;
+        }
+        .export-log-entry {
+            padding: 0.2rem 0;
+            line-height: 1.4;
+        }
+        .export-log-entry.success { color: #4ec9b0; }
+        .export-log-entry.error { color: #f48771; }
+        .export-log-entry.warning { color: #dcdcaa; }
+        .export-log-entry.info { color: #9cdcfe; }
+        .export-log-entry.image { color: #ce9178; margin-left: 1rem; font-size: 0.75rem; }
+        .export-log-entry.image-success { color: #6a9955; margin-left: 1rem; font-size: 0.75rem; }
+        .export-log-entry.image-error { color: #f48771; margin-left: 1rem; font-size: 0.75rem; }
+        .export-modal-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            flex-shrink: 0;
+        }
+        .expand-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            color: #666;
+        }
+        .expand-btn:hover {
+            background: #f0f0f0;
+        }
+        
+        /* Orphan folder modal */
+        .orphan-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .orphan-modal-content {
+            background: white;
+            border-radius: 8px;
+            padding: 1rem;
+            width: 600px;
+            max-width: 90%;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .orphan-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid #ddd;
+        }
+        .orphan-modal-header h3 {
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .orphan-modal-body {
+            flex: 1;
+            overflow-y: auto;
+        }
+        .orphan-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .orphan-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+        }
+        .orphan-info {
+            flex: 1;
+        }
+        .orphan-name {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+        .orphan-type {
+            font-size: 0.8rem;
+            color: #666;
+        }
+        .orphan-reason {
+            font-size: 0.75rem;
+            color: #888;
+            margin-top: 0.25rem;
+        }
+        .orphan-path {
+            font-size: 0.7rem;
+            color: #999;
+            font-family: monospace;
+            margin-top: 0.25rem;
+            word-break: break-all;
+        }
+        .orphan-delete-btn {
+            padding: 0.4rem 0.75rem;
+            border: 1px solid #dc3545;
+            background: white;
+            color: #dc3545;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+        .orphan-delete-btn:hover {
+            background: #dc3545;
+            color: white;
+        }
+        .orphan-delete-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* Status bar */
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #666;
+        }
+        
+        /* Loading states */
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #7719aa;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Cache info */
+        .cache-info {
+            font-size: 0.75rem;
+            color: #888;
+            padding: 0.25rem 0.5rem;
+            background: #f0f0f0;
+            border-radius: 3px;
+        }
+        .cache-info.from-cache {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        /* Selection summary */
+        .selection-summary {
+            font-size: 0.8rem;
+            color: #555;
+        }
+        .selection-summary strong {
+            color: #7719aa;
+        }
+        
+        /* Timestamps */
+        .timestamp {
+            font-size: 0.7rem;
+            color: #999;
+        }
+        .timestamp.exported {
+            color: #28a745;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <span class="logo">📓</span>
+            <span>OneNote Web Exporter</span>
+        </div>
+        <div class="nav-links">
+            <a href="{{ url_for('index') }}">Home</a>
+            <a href="{{ url_for('browse_page') }}" class="active">Browse</a>
+            <a href="{{ url_for('settings_page') }}">Settings</a>
+        </div>
+    </nav>
+
+    <div class="panels-container">
+        <!-- Left Panel - Notebook Tree -->
+        <div class="panel notebooks-panel">
+            <div class="panel-header">
+                <h2>📚 Notebooks</h2>
+                <div class="toolbar">
+                    <button class="toolbar-btn" id="btn-refresh" title="Refresh from API">🔄</button>
+                    <button class="toolbar-btn" id="btn-expand-all" title="Expand all">⊞</button>
+                    <button class="toolbar-btn" id="btn-collapse-all" title="Collapse all">⊟</button>
+                </div>
+            </div>
+            <div class="panel-content">
+                <div id="notebooks-loading" class="tree-loading" style="text-align: center; padding: 2rem;">
+                    <div class="loading-spinner"></div>
+                    <p style="margin-top: 0.5rem;">Loading notebooks...</p>
+                </div>
+                <div id="notebooks-tree" class="tree-view" style="display: none;"></div>
+                <div id="notebooks-error" style="display: none; padding: 1rem; color: #c00;"></div>
+            </div>
+            <div class="panel-footer">
+                <div class="status-bar">
+                    <div class="selection-summary" id="selection-summary">
+                        No items selected
+                    </div>
+                    <div class="cache-info" id="cache-info">
+                        Not loaded
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Middle Panel - Export Preview -->
+        <div class="panel export-panel">
+            <div class="panel-header">
+                <h2>📁 Export Structure</h2>
+                <div class="toolbar">
+                    <button class="toolbar-btn" id="btn-check-orphans" title="Check for orphaned folders">
+                        🔍 Check
+                    </button>
+                    <button class="toolbar-btn primary" id="btn-export" disabled>
+                        Export Selected
+                    </button>
+                </div>
+            </div>
+            <div class="panel-content">
+                <div class="export-tree" id="export-tree">
+                    <div class="export-empty">
+                        <p>📂 Select notebooks, sections,</p>
+                        <p>or pages to see export preview</p>
+                    </div>
+                </div>
+            </div>
+            <div class="panel-footer">
+                <div class="status-bar">
+                    <span id="export-stats">0 items to export</span>
+                    <span id="export-folder" class="timestamp" title="Export folder"></span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Right Panel - Page Preview -->
+        <div class="panel preview-panel">
+            <div class="panel-header">
+                <h2>👁️ Page Preview</h2>
+                <div class="toolbar">
+                    <select id="preview-format" class="toolbar-btn">
+                        <option value="html">HTML</option>
+                        <option value="md">Markdown</option>
+                    </select>
+                    <button class="toolbar-btn" id="btn-open-page" title="Open page in new tab" disabled>
+                        🔗 Open
+                    </button>
+                </div>
+            </div>
+            <div class="panel-content">
+                <div class="preview-content" id="preview-content">
+                    <div class="preview-empty">
+                        <p style="font-size: 2rem;">📄</p>
+                        <p>Click on a page to preview</p>
+                        <p style="font-size: 0.8rem; margin-top: 1rem;">The preview shows how the page<br>will look after export to Joplin format</p>
+                    </div>
+                </div>
+            </div>
+            <div class="panel-footer">
+                <div class="status-bar">
+                    <span id="preview-info">No page selected</span>
+                    <span id="preview-timestamp" class="timestamp"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Orphan Folders Modal -->
+    <div class="orphan-modal" id="orphan-modal">
+        <div class="orphan-modal-content">
+            <div class="orphan-modal-header">
+                <h3>🔍 Orphan Folder Check</h3>
+                <button class="toolbar-btn" onclick="closeOrphanModal()">✕ Close</button>
+            </div>
+            <div class="orphan-modal-body" id="orphan-content">
+                <!-- Content populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+    <script>
+        // ====================================================================
+        // State Management
+        // ====================================================================
+        const state = {
+            notebooks: [],
+            selection: {
+                notebooks: new Set(),
+                sections: new Set(),
+                pages: new Set()
+            },
+            expanded: {
+                notebooks: new Set(),
+                sections: new Set()
+            },
+            exportExpanded: {
+                root: true,
+                notebooks: new Set(),
+                sections: new Set()
+            },
+            exportedPaths: {}, // Tracks which page IDs have been exported with their paths
+            cache: {
+                sections: {},
+                pages: {}
+            },
+            currentPage: null,
+            currentPageContent: null,
+            currentPageUrl: null,
+            fromCache: false,
+            loading: false,
+            exportFolder: ''
+        };
+        
+        // ====================================================================
+        // Initialization
+        // ====================================================================
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const settingsRes = await fetch('/api/settings');
+                const settings = await settingsRes.json();
+                state.exportFolder = settings.export?.output_root || 'OneNote-Exports';
+                document.getElementById('export-folder').textContent = state.exportFolder;
+            } catch (e) {
+                console.error('Failed to load settings:', e);
+            }
+            
+            // Load previously exported files from cache
+            try {
+                const cacheRes = await fetch('/api/cache/exported-pages');
+                const cacheData = await cacheRes.json();
+                if (cacheData.exported_pages) {
+                    state.exportedPaths = cacheData.exported_pages;
+                }
+            } catch (e) {
+                console.error('Failed to load export cache:', e);
+            }
+            
+            // Validate exported files actually exist on filesystem
+            await validateExportedFiles();
+            
+            // Check for incomplete exports that can be resumed
+            await checkForIncompleteExport();
+            
+            await loadNotebooks(false);
+            
+            document.getElementById('btn-refresh').addEventListener('click', () => loadNotebooks(true));
+            document.getElementById('btn-expand-all').addEventListener('click', expandAll);
+            document.getElementById('btn-collapse-all').addEventListener('click', collapseAll);
+            document.getElementById('btn-export').addEventListener('click', () => startExport());
+            document.getElementById('btn-open-page').addEventListener('click', openPageInNewTab);
+            document.getElementById('preview-format').addEventListener('change', () => updatePreview());
+            document.getElementById('btn-check-orphans').addEventListener('click', checkOrphanFolders);
+        });
+        
+        // ====================================================================
+        // Data Loading
+        // ====================================================================
+        async function loadNotebooks(forceRefresh = false) {
+            const loadingEl = document.getElementById('notebooks-loading');
+            const treeEl = document.getElementById('notebooks-tree');
+            const errorEl = document.getElementById('notebooks-error');
+            
+            loadingEl.style.display = 'block';
+            treeEl.style.display = 'none';
+            errorEl.style.display = 'none';
+            state.loading = true;
+            
+            try {
+                const url = `/api/notebooks${forceRefresh ? '?force_refresh=true' : ''}`;
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (!response.ok) throw new Error(data.error || 'Failed to load notebooks');
+                
+                state.notebooks = data.notebooks || [];
+                state.fromCache = data.from_cache || false;
+                
+                renderNotebooks();
+                updateCacheInfo(data);
+                
+                loadingEl.style.display = 'none';
+                treeEl.style.display = 'block';
+                
+                // Auto-create notebook folders in export directory
+                if (state.notebooks.length > 0) {
+                    try {
+                        await fetch('/api/folders/create-notebook-folders', { method: 'POST' });
+                    } catch (e) {
+                        console.log('Auto-create folders:', e.message);
+                    }
+                }
+                
+            } catch (err) {
+                loadingEl.style.display = 'none';
+                errorEl.style.display = 'block';
+                errorEl.innerHTML = `<p>⚠️ ${escapeHtml(err.message)}</p>
+                    <button class="toolbar-btn" onclick="loadNotebooks(true)">Retry</button>`;
+            } finally {
+                state.loading = false;
+            }
+        }
+        
+        async function loadSections(notebookId, forceRefresh = false) {
+            if (!forceRefresh && state.cache.sections[notebookId]) {
+                return state.cache.sections[notebookId];
+            }
+            
+            const childrenEl = document.getElementById(`children-${notebookId}`);
+            if (childrenEl) childrenEl.innerHTML = '<div class="tree-loading">⏳ Loading sections...</div>';
+            
+            try {
+                const url = `/api/notebooks/${notebookId}/sections${forceRefresh ? '?force_refresh=true' : ''}`;
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (!response.ok) throw new Error(data.error || 'Failed to load sections');
+                
+                state.cache.sections[notebookId] = data.sections || [];
+                return state.cache.sections[notebookId];
+                
+            } catch (err) {
+                if (childrenEl) childrenEl.innerHTML = `<div class="tree-loading" style="color: #c00;">Error: ${escapeHtml(err.message)}</div>`;
+                return [];
+            }
+        }
+        
+        async function loadPages(sectionId, forceRefresh = false) {
+            if (!forceRefresh && state.cache.pages[sectionId]) {
+                return state.cache.pages[sectionId];
+            }
+            
+            const childrenEl = document.getElementById(`children-${sectionId}`);
+            if (childrenEl) childrenEl.innerHTML = '<div class="tree-loading">⏳ Loading pages...</div>';
+            
+            try {
+                const url = `/api/sections/${sectionId}/pages${forceRefresh ? '?force_refresh=true' : ''}`;
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (!response.ok) throw new Error(data.error || 'Failed to load pages');
+                
+                state.cache.pages[sectionId] = data.pages || [];
+                return state.cache.pages[sectionId];
+                
+            } catch (err) {
+                if (childrenEl) childrenEl.innerHTML = `<div class="tree-loading" style="color: #c00;">Error: ${escapeHtml(err.message)}</div>`;
+                return [];
+            }
+        }
+        
+        // ====================================================================
+        // Rendering
+        // ====================================================================
+        function renderNotebooks() {
+            const treeEl = document.getElementById('notebooks-tree');
+            
+            if (!state.notebooks.length) {
+                treeEl.innerHTML = '<div class="tree-loading">No notebooks found</div>';
+                return;
+            }
+            
+            // Root node "Notebooks"
+            let html = `
+            <div class="tree-item" data-type="root" data-id="notebooks-root">
+                <div class="tree-row">
+                    <span class="tree-toggle" onclick="toggleRootExpand(event)">▼</span>
+                    <span class="tree-icon">📚</span>
+                    <span class="tree-name"><strong>Notebooks</strong></span>
+                    <span class="tree-badge">${state.notebooks.length}</span>
+                </div>
+                <div class="tree-children expanded" id="children-notebooks-root">`;
+            
+            for (const nb of state.notebooks) {
+                const isExpanded = state.expanded.notebooks.has(nb.id);
+                const isSelected = state.selection.notebooks.has(nb.id);
+                const sectionCount = nb.section_count ?? '?';
+                
+                html += `
+                <div class="tree-item" data-type="notebook" data-id="${nb.id}">
+                    <div class="tree-row ${isSelected ? 'selected' : ''}" onclick="selectItem('notebook', '${nb.id}', event)">
+                        <span class="tree-toggle" onclick="toggleExpand('notebook', '${nb.id}', event)">${isExpanded ? '▼' : '▶'}</span>
+                        <input type="checkbox" class="tree-checkbox" ${isSelected ? 'checked' : ''} onclick="toggleCheck('notebook', '${nb.id}', event)">
+                        <span class="tree-icon">📓</span>
+                        <span class="tree-name" title="${escapeHtml(nb.name)}">${escapeHtml(nb.name)}</span>
+                        <span class="tree-badge ${sectionCount === '?' ? 'loading' : ''}">${sectionCount}</span>
+                    </div>
+                    <div class="tree-children ${isExpanded ? 'expanded' : ''}" id="children-${nb.id}">
+                        ${isExpanded ? '' : '<div class="tree-loading">Loading...</div>'}
+                    </div>
+                </div>`;
+            }
+            
+            html += `</div></div>`;
+            
+            treeEl.innerHTML = html;
+            
+            for (const nbId of state.expanded.notebooks) {
+                renderSectionsForNotebook(nbId);
+            }
+            
+            // Update export tree to mirror structure
+            updateExportTree();
+        }
+        
+        function toggleRootExpand(event) {
+            if (event) event.stopPropagation();
+            const childrenEl = document.getElementById('children-notebooks-root');
+            const toggleEl = event?.target;
+            if (childrenEl.classList.contains('expanded')) {
+                childrenEl.classList.remove('expanded');
+                if (toggleEl) toggleEl.textContent = '▶';
+            } else {
+                childrenEl.classList.add('expanded');
+                if (toggleEl) toggleEl.textContent = '▼';
+            }
+        }
+        
+        async function renderSectionsForNotebook(notebookId) {
+            const sections = await loadSections(notebookId);
+            const childrenEl = document.getElementById(`children-${notebookId}`);
+            if (!childrenEl) return;
+            
+            if (!sections.length) {
+                childrenEl.innerHTML = '<div class="tree-loading">No sections</div>';
+                return;
+            }
+            
+            let html = '';
+            for (const sec of sections) {
+                const isExpanded = state.expanded.sections.has(sec.id);
+                const isSelected = state.selection.sections.has(sec.id);
+                const pageCount = sec.page_count ?? '?';
+                
+                html += `
+                <div class="tree-item" data-type="section" data-id="${sec.id}" data-notebook="${notebookId}">
+                    <div class="tree-row ${isSelected ? 'selected' : ''}" onclick="selectItem('section', '${sec.id}', event)">
+                        <span class="tree-toggle" onclick="toggleExpand('section', '${sec.id}', event)">${isExpanded ? '▼' : '▶'}</span>
+                        <input type="checkbox" class="tree-checkbox" ${isSelected ? 'checked' : ''} onclick="toggleCheck('section', '${sec.id}', event)">
+                        <span class="tree-icon">📑</span>
+                        <span class="tree-name" title="${escapeHtml(sec.name)}">${escapeHtml(sec.name)}</span>
+                        <span class="tree-badge ${pageCount === '?' ? 'loading' : ''}">${pageCount}</span>
+                    </div>
+                    <div class="tree-children ${isExpanded ? 'expanded' : ''}" id="children-${sec.id}">
+                        ${isExpanded ? '' : '<div class="tree-loading">Loading...</div>'}
+                    </div>
+                </div>`;
+            }
+            
+            childrenEl.innerHTML = html;
+            
+            const nb = state.notebooks.find(n => n.id === notebookId);
+            if (nb) {
+                nb.section_count = sections.length;
+                const badge = document.querySelector(`[data-id="${notebookId}"] .tree-badge`);
+                if (badge) {
+                    badge.textContent = sections.length;
+                    badge.classList.remove('loading');
+                }
+            }
+            
+            for (const sec of sections) {
+                if (state.expanded.sections.has(sec.id)) {
+                    renderPagesForSection(sec.id);
+                }
+            }
+            
+            // Update export tree to mirror structure
+            updateExportTree();
+        }
+        
+        async function renderPagesForSection(sectionId) {
+            const pages = await loadPages(sectionId);
+            const childrenEl = document.getElementById(`children-${sectionId}`);
+            if (!childrenEl) return;
+            
+            if (!pages.length) {
+                childrenEl.innerHTML = '<div class="tree-loading">No pages</div>';
+                return;
+            }
+            
+            let html = '';
+            for (const pg of pages) {
+                const isSelected = state.selection.pages.has(pg.id);
+                const isChild = (pg.level || 0) > 0;
+                const exportedAt = pg.exported_at;
+                
+                html += `
+                <div class="tree-item" data-type="page" data-id="${pg.id}" data-section="${sectionId}">
+                    <div class="tree-row ${isSelected ? 'selected' : ''}" onclick="selectPage('${pg.id}', event)">
+                        <span class="tree-toggle empty"></span>
+                        <input type="checkbox" class="tree-checkbox" ${isSelected ? 'checked' : ''} onclick="toggleCheck('page', '${pg.id}', event)">
+                        <span class="tree-icon">${isChild ? '📄' : '📝'}</span>
+                        <span class="tree-name" title="${escapeHtml(pg.title || 'Untitled')}">${escapeHtml(pg.title || 'Untitled')}</span>
+                        ${isChild ? `<span class="page-level">L${pg.level}</span>` : ''}
+                        ${exportedAt ? `<span class="timestamp exported" title="Exported">✓</span>` : ''}
+                    </div>
+                </div>`;
+            }
+            
+            childrenEl.innerHTML = html;
+            
+            const secBadge = document.querySelector(`[data-type="section"][data-id="${sectionId}"] .tree-badge`);
+            if (secBadge) {
+                secBadge.textContent = pages.length;
+                secBadge.classList.remove('loading');
+            }
+            
+            // Update export tree to mirror structure
+            updateExportTree();
+        }
+        
+        // ====================================================================
+        // Interaction Handlers
+        // ====================================================================
+        async function toggleExpand(type, id, event) {
+            if (event) event.stopPropagation();
+            
+            const expandedSet = type === 'notebook' ? state.expanded.notebooks : state.expanded.sections;
+            const exportExpandedSet = type === 'notebook' ? state.exportExpanded.notebooks : state.exportExpanded.sections;
+            const childrenEl = document.getElementById(`children-${id}`);
+            // Always find the toggle by selector - don't use event.target which might be the name or icon
+            const toggleEl = document.querySelector(`[data-type="${type}"][data-id="${id}"] .tree-toggle`);
+            
+            if (expandedSet.has(id)) {
+                expandedSet.delete(id);
+                exportExpandedSet.delete(id);
+                childrenEl?.classList.remove('expanded');
+                if (toggleEl) toggleEl.textContent = '▶';
+            } else {
+                expandedSet.add(id);
+                exportExpandedSet.add(id);
+                childrenEl?.classList.add('expanded');
+                if (toggleEl) toggleEl.textContent = '▼';
+                
+                if (type === 'notebook') {
+                    await renderSectionsForNotebook(id);
+                } else if (type === 'section') {
+                    await renderPagesForSection(id);
+                }
+            }
+            
+            // Update export tree
+            updateExportTree();
+        }
+        
+        function toggleCheck(type, id, event) {
+            if (event) event.stopPropagation();
+            
+            const selectionSet = type === 'notebook' ? state.selection.notebooks :
+                                 type === 'section' ? state.selection.sections :
+                                 state.selection.pages;
+            
+            if (selectionSet.has(id)) {
+                selectionSet.delete(id);
+                if (type === 'notebook') uncheckNotebookChildren(id);
+                else if (type === 'section') uncheckSectionChildren(id);
+            } else {
+                selectionSet.add(id);
+                if (type === 'notebook') checkNotebookChildren(id);
+                else if (type === 'section') checkSectionChildren(id);
+            }
+            
+            updateSelectionUI();
+            updateExportTree();
+        }
+        
+        function checkNotebookChildren(notebookId) {
+            const sections = state.cache.sections[notebookId] || [];
+            for (const sec of sections) {
+                state.selection.sections.add(sec.id);
+                checkSectionChildren(sec.id);
+            }
+        }
+        
+        function uncheckNotebookChildren(notebookId) {
+            const sections = state.cache.sections[notebookId] || [];
+            for (const sec of sections) {
+                state.selection.sections.delete(sec.id);
+                uncheckSectionChildren(sec.id);
+            }
+        }
+        
+        function checkSectionChildren(sectionId) {
+            const pages = state.cache.pages[sectionId] || [];
+            for (const pg of pages) state.selection.pages.add(pg.id);
+        }
+        
+        function uncheckSectionChildren(sectionId) {
+            const pages = state.cache.pages[sectionId] || [];
+            for (const pg of pages) state.selection.pages.delete(pg.id);
+        }
+        
+        function selectItem(type, id, event) {
+            toggleExpand(type, id, event);
+        }
+        
+        async function selectPage(pageId, event) {
+            if (event) event.stopPropagation();
+            
+            document.querySelectorAll('.tree-row.selected').forEach(el => el.classList.remove('selected'));
+            const row = document.querySelector(`[data-type="page"][data-id="${pageId}"] .tree-row`);
+            if (row) row.classList.add('selected');
+            
+            state.currentPage = pageId;
+            
+            // Make sure this page appears in export tree (even if not exported)
+            ensurePageInExportTree(pageId);
+            
+            // Check if page has been exported
+            const isExported = state.exportedPaths[pageId] ? true : false;
+            
+            if (isExported) {
+                await loadPagePreview(pageId);
+            } else {
+                showUnexportedPagePlaceholder(pageId);
+            }
+        }
+        
+        function ensurePageInExportTree(pageId) {
+            // Find the page's section and notebook, expand them in export tree
+            for (const [sectionId, pages] of Object.entries(state.cache.pages)) {
+                const page = pages.find(p => p.id === pageId);
+                if (page) {
+                    // Find notebook for this section
+                    for (const [nbId, sections] of Object.entries(state.cache.sections)) {
+                        if (sections.find(s => s.id === sectionId)) {
+                            // Expand in export tree
+                            state.exportExpanded.notebooks.add(nbId);
+                            state.exportExpanded.sections.add(sectionId);
+                            updateExportTree();
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+        
+        function showUnexportedPagePlaceholder(pageId) {
+            const previewEl = document.getElementById('preview-content');
+            const infoEl = document.getElementById('preview-info');
+            const timestampEl = document.getElementById('preview-timestamp');
+            const openBtn = document.getElementById('btn-open-page');
+            
+            // Find page info
+            let pageInfo = null;
+            for (const pages of Object.values(state.cache.pages)) {
+                pageInfo = pages.find(p => p.id === pageId);
+                if (pageInfo) break;
+            }
+            
+            const pageName = pageInfo?.title || 'Untitled';
+            infoEl.textContent = pageName;
+            timestampEl.textContent = 'Not yet exported';
+            openBtn.disabled = true;
+            
+            previewEl.innerHTML = `
+                <div class="preview-empty">
+                    <p style="font-size: 2rem;">📄</p>
+                    <p><strong>${escapeHtml(pageName)}</strong></p>
+                    <p style="color: #888; margin-top: 1rem;">This page has not been exported yet.</p>
+                    <p style="color: #888;">Select the checkbox and click <strong>Export Selected</strong></p>
+                    <p style="color: #888;">to create the .md file.</p>
+                </div>
+            `;
+        }
+        
+        function updateSelectionUI() {
+            document.querySelectorAll('[data-type="notebook"]').forEach(el => {
+                const id = el.dataset.id;
+                const cb = el.querySelector('.tree-checkbox');
+                if (cb) cb.checked = state.selection.notebooks.has(id);
+            });
+            document.querySelectorAll('[data-type="section"]').forEach(el => {
+                const id = el.dataset.id;
+                const cb = el.querySelector('.tree-checkbox');
+                if (cb) cb.checked = state.selection.sections.has(id);
+            });
+            document.querySelectorAll('[data-type="page"]').forEach(el => {
+                const id = el.dataset.id;
+                const cb = el.querySelector('.tree-checkbox');
+                if (cb) cb.checked = state.selection.pages.has(id);
+            });
+            
+            const summary = document.getElementById('selection-summary');
+            const nbCount = state.selection.notebooks.size;
+            const secCount = state.selection.sections.size;
+            const pgCount = state.selection.pages.size;
+            
+            if (nbCount + secCount + pgCount === 0) {
+                summary.innerHTML = 'No items selected';
+            } else {
+                const parts = [];
+                if (nbCount) parts.push(`<strong>${nbCount}</strong> notebook${nbCount > 1 ? 's' : ''}`);
+                if (secCount) parts.push(`<strong>${secCount}</strong> section${secCount > 1 ? 's' : ''}`);
+                if (pgCount) parts.push(`<strong>${pgCount}</strong> page${pgCount > 1 ? 's' : ''}`);
+                summary.innerHTML = parts.join(', ');
+            }
+            
+            document.getElementById('btn-export').disabled = (nbCount + secCount + pgCount === 0);
+        }
+        
+        // ====================================================================
+        // Export Tree (shows actual folder structure on disk)
+        // ====================================================================
+        function updateExportTree() {
+            const treeEl = document.getElementById('export-tree');
+            const statsEl = document.getElementById('export-stats');
+            
+            if (!state.notebooks.length) {
+                treeEl.innerHTML = `<div class="export-empty"><p>📂 Load notebooks to see export structure</p></div>`;
+                return;
+            }
+            
+            const rootExpanded = state.exportExpanded.root;
+            const rootPath = state.exportFolder || 'c:\\OneNote-Exports';
+            const oneNoteExportPath = rootPath + '\\OneNote_Export';
+            
+            // Check if any pages have been exported
+            const hasExportedPages = Object.keys(state.exportedPaths).length > 0;
+            
+            let html = `
+            <div class="tree-item" data-type="export-root">
+                <div class="tree-row created">
+                    <span class="tree-toggle" onclick="toggleExportExpand('root', 'export-root', event)">${rootExpanded ? '▼' : '▶'}</span>
+                    <span class="tree-icon">📁</span>
+                    <span class="tree-name" title="${escapeHtml(oneNoteExportPath)}">OneNote_Export</span>
+                </div>
+                <div class="tree-children ${rootExpanded ? 'expanded' : ''}" id="export-children-root">`;
+            
+            // Show ALL notebooks (folders are auto-created on disk)
+            for (const nb of state.notebooks) {
+                const nbExpanded = state.exportExpanded.notebooks.has(nb.id);
+                const nbName = sanitizeFilename(nb.name);
+                
+                // Check if any pages in this notebook have been exported
+                const nbHasExported = hasExportedPagesInNotebook(nb.id);
+                
+                html += `
+                <div class="tree-item" data-type="export-notebook" data-id="${nb.id}">
+                    <div class="tree-row created">
+                        <span class="tree-toggle" onclick="toggleExportExpand('notebook', '${nb.id}', event)">${nbExpanded ? '▼' : '▶'}</span>
+                        <span class="tree-icon">📁</span>
+                        <span class="tree-name" title="${escapeHtml(nbName)}">${escapeHtml(nbName)}</span>
+                        ${nbHasExported ? '<span class="exported-check" style="color:#28a745;">●</span>' : ''}
+                    </div>
+                    <div class="tree-children ${nbExpanded ? 'expanded' : ''}" id="export-children-${nb.id}">`;
+                
+                // Show sections if loaded (from cache)
+                const sections = state.cache.sections[nb.id] || [];
+                if (sections.length > 0) {
+                    for (const sec of sections) {
+                        const secExpanded = state.exportExpanded.sections.has(sec.id);
+                        const secName = sanitizeFilename(sec.name);
+                        
+                        // Check if any pages in this section have been exported
+                        const secHasExported = hasExportedPagesInSection(sec.id);
+                        
+                        // Section folder is created when first page is exported
+                        const secFolderExists = secHasExported;
+                        
+                        html += `
+                        <div class="tree-item" data-type="export-section" data-id="${sec.id}">
+                            <div class="tree-row ${secFolderExists ? 'created' : 'not-created'}">
+                                <span class="tree-toggle" onclick="toggleExportExpand('section', '${sec.id}', event)">${secExpanded ? '▼' : '▶'}</span>
+                                <span class="tree-icon">📁</span>
+                                <span class="tree-name" title="${escapeHtml(secName)}">${escapeHtml(secName)}</span>
+                                ${secHasExported ? '<span class="exported-check" style="color:#28a745;">●</span>' : ''}
+                            </div>
+                            <div class="tree-children ${secExpanded ? 'expanded' : ''}" id="export-children-${sec.id}">`;
+                        
+                        // Show pages if loaded
+                        const pages = state.cache.pages[sec.id] || [];
+                        if (pages.length > 0) {
+                            for (const pg of pages) {
+                                const pgName = sanitizeFilename(pg.title || 'Untitled');
+                                const pgExported = state.exportedPaths[pg.id] ? true : false;
+                                const isChild = (pg.level || 0) > 0;
+                                
+                                html += `
+                                <div class="tree-item" data-type="export-page" data-id="${pg.id}">
+                                    <div class="tree-row ${pgExported ? 'created' : 'not-created'}" onclick="selectExportFile('${pg.id}', ${pgExported}, event)">
+                                        <span class="tree-toggle empty"></span>
+                                        <span class="tree-icon">${isChild ? '📄' : '📝'}</span>
+                                        <span class="tree-name" title="${escapeHtml(pgName)}.md">${escapeHtml(pgName)}.md</span>
+                                        ${pgExported ? '<span class="exported-check">✓</span>' : ''}
+                                    </div>
+                                </div>`;
+                            }
+                        } else {
+                            html += `<div class="tree-loading" style="color:#999;font-size:0.8rem;padding:0.25rem 0.5rem;">Expand in left panel to see pages</div>`;
+                        }
+                        
+                        html += `</div></div>`;
+                    }
+                } else {
+                    html += `<div class="tree-loading" style="color:#999;font-size:0.8rem;padding:0.25rem 0.5rem;">Expand in left panel to see sections</div>`;
+                }
+                
+                html += `</div></div>`;
+            }
+            
+            html += `</div></div>`;
+            
+            treeEl.innerHTML = html;
+            
+            // Count selected items for stats
+            const pageIds = getSelectedPageIds();
+            const exportedCount = pageIds.filter(id => state.exportedPaths[id]).length;
+            if (pageIds.length > 0) {
+                if (exportedCount > 0) {
+                    statsEl.textContent = `${pageIds.length} pages selected (${exportedCount} already exported)`;
+                } else {
+                    statsEl.textContent = `${pageIds.length} pages to export`;
+                }
+            } else {
+                const totalExported = Object.keys(state.exportedPaths).length;
+                if (totalExported > 0) {
+                    statsEl.textContent = `${totalExported} pages exported`;
+                } else {
+                    statsEl.textContent = 'Select items to export';
+                }
+            }
+        }
+        
+        function hasExportedPagesInNotebook(notebookId) {
+            const sections = state.cache.sections[notebookId] || [];
+            for (const sec of sections) {
+                if (hasExportedPagesInSection(sec.id)) return true;
+            }
+            return false;
+        }
+        
+        function hasExportedPagesInSection(sectionId) {
+            const pages = state.cache.pages[sectionId] || [];
+            for (const pg of pages) {
+                if (state.exportedPaths[pg.id]) return true;
+            }
+            return false;
+        }
+        
+        function toggleExportExpand(type, id, event) {
+            if (event) event.stopPropagation();
+            
+            if (type === 'root') {
+                state.exportExpanded.root = !state.exportExpanded.root;
+            } else if (type === 'notebook') {
+                if (state.exportExpanded.notebooks.has(id)) {
+                    state.exportExpanded.notebooks.delete(id);
+                } else {
+                    state.exportExpanded.notebooks.add(id);
+                }
+            } else if (type === 'section') {
+                if (state.exportExpanded.sections.has(id)) {
+                    state.exportExpanded.sections.delete(id);
+                } else {
+                    state.exportExpanded.sections.add(id);
+                }
+            }
+            
+            updateExportTree();
+        }
+        
+        function selectExportFile(pageId, isExported, event) {
+            if (event) event.stopPropagation();
+            
+            // Highlight in export tree
+            document.querySelectorAll('.export-tree .tree-row.selected').forEach(el => el.classList.remove('selected'));
+            const row = document.querySelector(`[data-type="export-page"][data-id="${pageId}"] .tree-row`);
+            if (row) row.classList.add('selected');
+            
+            // Also highlight in notebook tree
+            document.querySelectorAll('.notebooks-panel .tree-row.selected').forEach(el => el.classList.remove('selected'));
+            const nbRow = document.querySelector(`[data-type="page"][data-id="${pageId}"] .tree-row`);
+            if (nbRow) nbRow.classList.add('selected');
+            
+            state.currentPage = pageId;
+            
+            if (isExported) {
+                loadPagePreview(pageId);
+            } else {
+                showUnexportedPagePlaceholder(pageId);
+            }
+        }
+        
+        // Keep export tree in sync with notebook tree
+        function syncExportTreeExpansion() {
+            // When notebook tree expands, also expand in export tree
+            state.exportExpanded.notebooks = new Set(state.expanded.notebooks);
+            state.exportExpanded.sections = new Set(state.expanded.sections);
+            updateExportTree();
+        }
+        
+        // ====================================================================
+        // Page Preview
+        // ====================================================================
+        async function loadPagePreview(pageId) {
+            const previewEl = document.getElementById('preview-content');
+            const infoEl = document.getElementById('preview-info');
+            const timestampEl = document.getElementById('preview-timestamp');
+            const openBtn = document.getElementById('btn-open-page');
+            
+            previewEl.innerHTML = `<div class="preview-empty"><div class="loading-spinner"></div><p style="margin-top: 1rem;">Loading page content...</p></div>`;
+            openBtn.disabled = true;
+            
+            try {
+                const response = await fetch(`/api/pages/${pageId}/content`);
+                const data = await response.json();
+                
+                if (!response.ok) throw new Error(data.error || 'Failed to load page');
+                
+                let pageInfo = null;
+                for (const pages of Object.values(state.cache.pages)) {
+                    pageInfo = pages.find(p => p.id === pageId);
+                    if (pageInfo) break;
+                }
+                
+                infoEl.textContent = pageInfo?.title || 'Untitled';
+                timestampEl.textContent = pageInfo?.modified ? `Modified: ${formatDate(pageInfo.modified)}` : '';
+                
+                state.currentPageContent = data.content;
+                state.currentPageUrl = pageInfo?.contentUrl || null;
+                openBtn.disabled = false;
+                updatePreview();
+                
+            } catch (err) {
+                previewEl.innerHTML = `<div class="preview-empty" style="color: #c00;"><p>⚠️ ${escapeHtml(err.message)}</p></div>`;
+            }
+        }
+        
+        function openPageInNewTab() {
+            if (!state.currentPage) return;
+            
+            // Find page info to get the OneNote URL
+            let pageInfo = null;
+            for (const pages of Object.values(state.cache.pages)) {
+                pageInfo = pages.find(p => p.id === state.currentPage);
+                if (pageInfo) break;
+            }
+            
+            // Open page content in a new tab (via our server)
+            const previewUrl = `/api/pages/${state.currentPage}/preview`;
+            window.open(previewUrl, '_blank');
+        }
+        
+        function updatePreview() {
+            const previewEl = document.getElementById('preview-content');
+            const format = document.getElementById('preview-format').value;
+            
+            if (!state.currentPageContent) return;
+            
+            if (format === 'html') {
+                // Create iframe for safe HTML rendering
+                const iframe = document.createElement('iframe');
+                iframe.style.cssText = 'width: 100%; height: 100%; border: 1px solid #ddd; border-radius: 4px; background: white;';
+                iframe.srcdoc = `<!DOCTYPE html><html><head><style>body{font-family:sans-serif;padding:1rem;margin:0;}img{max-width:100%;height:auto;}</style></head><body>${state.currentPageContent}</body></html>`;
+                previewEl.innerHTML = '';
+                previewEl.appendChild(iframe);
+            } else {
+                const md = htmlToMarkdown(state.currentPageContent);
+                previewEl.innerHTML = `<pre class="preview-md">${escapeHtml(md)}</pre>`;
+            }
+        }
+        
+        function htmlToMarkdown(html) {
+            let md = html;
+            md = md.replace(/<html[^>]*>|<\/html>|<head>[\s\S]*?<\/head>|<body[^>]*>|<\/body>/gi, '');
+            md = md.replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, '# $1\n\n');
+            md = md.replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, '## $1\n\n');
+            md = md.replace(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, '### $1\n\n');
+            md = md.replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, '**$1**');
+            md = md.replace(/<b[^>]*>([\s\S]*?)<\/b>/gi, '**$1**');
+            md = md.replace(/<em[^>]*>([\s\S]*?)<\/em>/gi, '*$1*');
+            md = md.replace(/<i[^>]*>([\s\S]*?)<\/i>/gi, '*$1*');
+            md = md.replace(/<a[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi, '[$2]($1)');
+            md = md.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, '- $1\n');
+            md = md.replace(/<\/?[ou]l[^>]*>/gi, '\n');
+            md = md.replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, '$1\n\n');
+            md = md.replace(/<br\s*\/?>/gi, '\n');
+            md = md.replace(/<div[^>]*>([\s\S]*?)<\/div>/gi, '$1\n');
+            md = md.replace(/<img[^>]*src="([^"]*)"[^>]*>/gi, '![image]($1)');
+            md = md.replace(/<[^>]+>/g, '');
+            md = md.replace(/\n{3,}/g, '\n\n');
+            md = md.trim();
+            
+            let pageTitle = 'Untitled';
+            for (const pages of Object.values(state.cache.pages)) {
+                const pg = pages.find(p => p.id === state.currentPage);
+                if (pg) { pageTitle = pg.title || 'Untitled'; break; }
+            }
+            
+            md = `---\ntitle: ${pageTitle}\ncreated: ${new Date().toISOString()}\nupdated: ${new Date().toISOString()}\n---\n\n${md}`;
+            return md;
+        }
+        
+        // ====================================================================
+        // Export
+        // ====================================================================
+        async function startExport(resumeFrom = null) {
+            const pageIds = getSelectedPageIds();
+            
+            if (pageIds.length === 0 && !resumeFrom) {
+                alert('Please select at least one page to export');
+                return;
+            }
+            
+            // Build page info list with metadata
+            const pages = [];
+            for (const pageId of pageIds) {
+                let pageInfo = null;
+                let sectionInfo = null;
+                let notebookInfo = null;
+                
+                for (const [sectionId, sectionPages] of Object.entries(state.cache.pages)) {
+                    pageInfo = sectionPages.find(p => p.id === pageId);
+                    if (pageInfo) {
+                        for (const [nbId, sections] of Object.entries(state.cache.sections)) {
+                            sectionInfo = sections.find(s => s.id === sectionId);
+                            if (sectionInfo) {
+                                notebookInfo = state.notebooks.find(n => n.id === nbId);
+                                break;
+                            }
+                        }
+                        break;
+                    }
+                }
+                
+                pages.push({
+                    page_id: pageId,
+                    page_title: pageInfo?.title || 'Untitled',
+                    notebook_name: notebookInfo?.name || 'Unknown',
+                    section_name: sectionInfo?.name || 'Unknown',
+                    created: pageInfo?.created,
+                    modified: pageInfo?.modified
+                });
+            }
+            
+            // Show enhanced export modal
+            showExportModal(pages.length);
+            
+            try {
+                // Start batch export
+                const startRes = await fetch('/api/export/batch/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        pages: pages,
+                        resume_from: resumeFrom 
+                    })
+                });
+                
+                const startData = await startRes.json();
+                if (!startRes.ok) throw new Error(startData.error || 'Failed to start export');
+                
+                addExportLog(`Export job started: ${startData.total_pages} pages`, 'info');
+                
+                // Connect to SSE stream
+                const eventSource = new EventSource('/api/export/batch/stream');
+                
+                eventSource.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    handleExportEvent(data);
+                    
+                    if (data.type === 'complete' || data.type === 'cancelled' || data.type === 'error') {
+                        eventSource.close();
+                        setExportComplete(true);
+                        updateExportTree();
+                        renderNotebooks(); // Update checkmarks
+                    }
+                };
+                
+                eventSource.onerror = () => {
+                    eventSource.close();
+                    addExportLog('Connection lost. Export may continue in background.', 'error');
+                    setExportComplete(true);
+                };
+                
+                // Store event source for cancellation
+                window.currentExportStream = eventSource;
+                
+            } catch (err) {
+                addExportLog(`Export failed: ${err.message}`, 'error');
+                setExportComplete(true);
+            }
+        }
+        
+        function handleExportEvent(data) {
+            switch (data.type) {
+                case 'start':
+                    updateExportStatus(`Starting export of ${data.total_pages} pages...`);
+                    break;
+                    
+                case 'page_start':
+                    updateExportStatus(`${data.current}/${data.total}: ${data.page_title}`);
+                    updateExportCurrentPage(data.notebook, data.section, data.page_title);
+                    addExportLog(`Fetching content for: ${data.page_title}`, 'info');
+                    break;
+                    
+                case 'status':
+                    addExportLog(data.message, 'info');
+                    break;
+                
+                case 'image_start':
+                    // Individual image download starting
+                    addExportLog(`  ↓ Downloading image ${data.index}/${data.total}...`, 'image');
+                    break;
+                    
+                case 'image_complete':
+                    // Individual image completed
+                    if (data.success) {
+                        window.exportImageStats.downloaded++;
+                        addExportLog(`  ✓ Image ${data.index}/${data.total}: saved`, 'image-success');
+                    } else {
+                        window.exportImageStats.failed++;
+                        addExportLog(`  ✗ Image ${data.index}/${data.total}: ${data.error || 'failed'}`, 'image-error');
+                    }
+                    window.exportImageStats.total = data.total;
+                    updateImageStats();
+                    break;
+                    
+                case 'images':
+                    // Summary of images for a page
+                    if (data.total > 0) {
+                        window.exportImageStats.total += data.total;
+                        window.exportImageStats.downloaded += data.downloaded;
+                        window.exportImageStats.failed += data.failed;
+                        updateImageStats();
+                        
+                        const status = data.failed > 0 
+                            ? `📷 ${data.downloaded}/${data.total} images (${data.failed} failed)`
+                            : `📷 ${data.downloaded}/${data.total} images`;
+                        addExportLog(status, data.failed > 0 ? 'warning' : 'info');
+                    }
+                    break;
+                    
+                case 'page_complete':
+                    addExportLog(`✓ ${data.page_title}`, 'success');
+                    updateExportProgress(data.exported, data.total);
+                    
+                    // Track exported page
+                    if (data.output_file) {
+                        state.exportedPaths[data.page_id] = data.output_file;
+                    }
+                    break;
+                    
+                case 'page_error':
+                    addExportLog(`✗ ${data.page_title}: ${data.error}`, 'error');
+                    updateExportProgress(data.current, data.total);
+                    break;
+                    
+                case 'skip':
+                    addExportLog(`⏭ ${data.page_title} (${data.reason})`, 'info');
+                    break;
+                    
+                case 'cancelled':
+                    addExportLog(`\n⚠️ Export cancelled. ${data.exported} pages completed.`, 'warning');
+                    updateExportStatus('Export cancelled');
+                    break;
+                    
+                case 'complete':
+                    const summary = data.errors > 0 
+                        ? `Export completed with ${data.errors} errors`
+                        : `Export complete!`;
+                    addExportLog(`\n${summary}`, data.errors > 0 ? 'warning' : 'success');
+                    addExportLog(`✓ ${data.exported} exported, ⏭ ${data.skipped} skipped, ✗ ${data.errors} errors`, 'info');
+                    
+                    // Final image summary
+                    if (window.exportImageStats.total > 0) {
+                        const imgSummary = window.exportImageStats.failed > 0
+                            ? `📷 Images: ${window.exportImageStats.downloaded}/${window.exportImageStats.total} (${window.exportImageStats.failed} failed)`
+                            : `📷 Images: ${window.exportImageStats.downloaded} total`;
+                        addExportLog(imgSummary, window.exportImageStats.failed > 0 ? 'warning' : 'info');
+                    }
+                    updateExportStatus(summary);
+                    break;
+                    
+                case 'error':
+                    addExportLog(`Error: ${data.message}`, 'error');
+                    break;
+            }
+        }
+        
+        function updateImageStats() {
+            const el = document.getElementById('export-image-status');
+            if (!el || !window.exportImageStats) return;
+            
+            const stats = window.exportImageStats;
+            if (stats.total > 0) {
+                const status = stats.failed > 0
+                    ? `📷 Images: ${stats.downloaded}/${stats.total} downloaded, ${stats.failed} failed`
+                    : `📷 Images: ${stats.downloaded}/${stats.total} downloaded`;
+                el.textContent = status;
+                el.style.color = stats.failed > 0 ? '#f48771' : '#888';
+            }
+        }
+        
+        function getSelectedPageIds() {
+            const pageIds = new Set(state.selection.pages);
+            
+            // Add pages from selected sections
+            for (const sectionId of state.selection.sections) {
+                const pages = state.cache.pages[sectionId] || [];
+                for (const pg of pages) pageIds.add(pg.id);
+            }
+            
+            // Add pages from selected notebooks
+            for (const notebookId of state.selection.notebooks) {
+                const sections = state.cache.sections[notebookId] || [];
+                for (const sec of sections) {
+                    const pages = state.cache.pages[sec.id] || [];
+                    for (const pg of pages) pageIds.add(pg.id);
+                }
+            }
+            
+            return Array.from(pageIds);
+        }
+        
+        function showExportModal(totalPages) {
+            const modal = document.createElement('div');
+            modal.className = 'export-modal';
+            modal.id = 'export-modal';
+            modal.innerHTML = `
+                <div class="export-modal-content" id="export-modal-content">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-shrink: 0;">
+                        <h3 style="margin: 0;">📤 Exporting Pages</h3>
+                        <button class="expand-btn" onclick="toggleExportModalSize()" title="Expand/Collapse">⛶</button>
+                    </div>
+                    <div id="export-status" style="margin-bottom: 0.5rem; flex-shrink: 0;">Preparing export of ${totalPages} pages...</div>
+                    <div id="export-current-page" style="font-size: 0.85rem; color: #666; margin-bottom: 0.75rem; flex-shrink: 0;"></div>
+                    <div class="export-progress-bar" style="flex-shrink: 0;">
+                        <div class="export-progress-fill" id="export-progress-fill" style="width: 0%"></div>
+                    </div>
+                    <div id="export-progress-text" style="text-align: center; font-size: 0.8rem; color: #666; margin-bottom: 0.5rem; flex-shrink: 0;">0 / ${totalPages} pages</div>
+                    <div id="export-image-status" style="text-align: center; font-size: 0.75rem; color: #888; margin-bottom: 0.5rem; flex-shrink: 0;"></div>
+                    <div class="export-log" id="export-log"></div>
+                    <div class="export-modal-buttons">
+                        <button class="toolbar-btn" id="export-cancel-btn" onclick="cancelExport()">Cancel</button>
+                        <button class="toolbar-btn" id="export-close-btn" disabled onclick="closeExportModal()">Close</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            // Track image stats
+            window.exportImageStats = { total: 0, downloaded: 0, failed: 0 };
+        }
+        
+        function toggleExportModalSize() {
+            const content = document.getElementById('export-modal-content');
+            if (content) {
+                content.classList.toggle('expanded');
+            }
+        }
+        
+        function updateExportStatus(message) {
+            const el = document.getElementById('export-status');
+            if (el) el.textContent = message;
+        }
+        
+        function updateExportCurrentPage(notebook, section, page) {
+            const el = document.getElementById('export-current-page');
+            if (el) el.innerHTML = `<span style="color: #7719aa;">📓 ${escapeHtml(notebook)}</span> › <span style="color: #666;">📁 ${escapeHtml(section)}</span> › <span style="color: #333;">📄 ${escapeHtml(page)}</span>`;
+        }
+        
+        function updateExportProgress(completed, total) {
+            const pct = Math.round((completed / total) * 100);
+            const fillEl = document.getElementById('export-progress-fill');
+            const textEl = document.getElementById('export-progress-text');
+            if (fillEl) fillEl.style.width = pct + '%';
+            if (textEl) textEl.textContent = `${completed} / ${total} pages (${pct}%)`;
+        }
+        
+        function addExportLog(message, type = 'info') {
+            const log = document.getElementById('export-log');
+            if (!log) return;
+            
+            const entry = document.createElement('div');
+            entry.className = `export-log-entry ${type}`;
+            
+            // Add timestamp for important events
+            if (type === 'success' || type === 'error') {
+                const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit'});
+                entry.innerHTML = `<span style="color: #888; font-size: 0.75rem;">[${time}]</span> ${escapeHtml(message)}`;
+            } else {
+                entry.textContent = message;
+            }
+            
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        function setExportComplete(complete) {
+            const closeBtn = document.getElementById('export-close-btn');
+            const cancelBtn = document.getElementById('export-cancel-btn');
+            if (closeBtn) closeBtn.disabled = !complete;
+            if (cancelBtn) cancelBtn.style.display = complete ? 'none' : 'inline-block';
+        }
+        
+        async function cancelExport() {
+            // Close SSE stream
+            if (window.currentExportStream) {
+                window.currentExportStream.close();
+            }
+            
+            // Tell server to cancel
+            try {
+                await fetch('/api/export/batch/cancel', { method: 'POST' });
+            } catch (e) {
+                console.error('Cancel error:', e);
+            }
+            
+            addExportLog('Cancelling export...', 'warning');
+        }
+        
+        function closeExportModal() {
+            const modal = document.getElementById('export-modal');
+            if (modal) modal.remove();
+            
+            // Cleanup
+            if (window.currentExportStream) {
+                window.currentExportStream.close();
+                window.currentExportStream = null;
+            }
+        }
+        
+        // ====================================================================
+        // Utility Functions
+        // ====================================================================
+        function expandAll() {
+            for (const nb of state.notebooks) {
+                if (!state.expanded.notebooks.has(nb.id)) toggleExpand('notebook', nb.id);
+            }
+        }
+        
+        function collapseAll() {
+            state.expanded.notebooks.clear();
+            state.expanded.sections.clear();
+            renderNotebooks();
+        }
+        
+        function updateCacheInfo(data) {
+            const el = document.getElementById('cache-info');
+            if (data.from_cache) {
+                const age = data.cache_age ? formatDate(data.cache_age) : 'cached';
+                el.textContent = `From cache (${age})`;
+                el.classList.add('from-cache');
+            } else {
+                el.textContent = 'Fresh data';
+                el.classList.remove('from-cache');
+            }
+        }
+        
+        function sanitizeFilename(name) {
+            return (name || 'Untitled').replace(/[<>:"/\\|?*]/g, '_').substring(0, 50);
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
+        }
+        
+        function formatDate(dateStr) {
+            try {
+                const date = new Date(dateStr);
+                return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            } catch { return dateStr; }
+        }
+        
+        async function validateExportedFiles() {
+            // Validate that files in exportedPaths actually exist on filesystem
+            if (Object.keys(state.exportedPaths).length === 0) return;
+            
+            try {
+                const response = await fetch('/api/cache/validate-exports', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ exported_pages: state.exportedPaths })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    // Update exportedPaths with only files that actually exist
+                    state.exportedPaths = data.valid_exports || {};
+                    
+                    if (data.removed_count > 0) {
+                        console.log(`Removed ${data.removed_count} stale export entries (files no longer exist)`);
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to validate exports:', e);
+            }
+        }
+        
+        // ====================================================================
+        // Orphan Folder Management
+        // ====================================================================
+        async function checkOrphanFolders() {
+            const modal = document.getElementById('orphan-modal');
+            const content = document.getElementById('orphan-content');
+            
+            content.innerHTML = '<div style="text-align: center; padding: 2rem;">⏳ Checking for orphaned folders...</div>';
+            modal.style.display = 'flex';
+            
+            try {
+                const response = await fetch('/api/folders/check-orphans');
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to check orphans');
+                }
+                
+                if (data.orphans.length === 0) {
+                    content.innerHTML = `
+                        <div style="text-align: center; padding: 2rem;">
+                            <p style="font-size: 2rem; margin-bottom: 1rem;">✅</p>
+                            <p style="font-size: 1.1rem; font-weight: 600;">All folders are in sync!</p>
+                            <p style="color: #666; margin-top: 0.5rem;">No orphaned folders found in the export directory.</p>
+                            <p style="color: #888; font-size: 0.85rem; margin-top: 1rem;">
+                                Export root: ${escapeHtml(data.export_root)}
+                            </p>
+                        </div>`;
+                } else {
+                    let html = `
+                        <div style="padding: 0.5rem 1rem; background: #fff3cd; border-bottom: 1px solid #ffc107; margin: -1rem -1rem 1rem -1rem;">
+                            <strong>⚠️ Found ${data.orphans.length} orphaned folder${data.orphans.length > 1 ? 's' : ''}</strong>
+                            <p style="font-size: 0.85rem; margin: 0.25rem 0 0 0; color: #856404;">
+                                These folders exist on disk but don't match your notebook/section structure.
+                            </p>
+                        </div>
+                        <div class="orphan-list">`;
+                    
+                    for (const orphan of data.orphans) {
+                        const icon = orphan.type === 'notebook' ? '📓' : '📁';
+                        const typeLabel = orphan.type === 'notebook' ? 'Notebook Folder' : 'Section Folder';
+                        html += `
+                            <div class="orphan-item" data-path="${escapeHtml(orphan.path)}">
+                                <div class="orphan-info">
+                                    <div class="orphan-name">${icon} ${escapeHtml(orphan.name)}</div>
+                                    <div class="orphan-type">${typeLabel}${orphan.parent ? ` in ${escapeHtml(orphan.parent)}` : ''}</div>
+                                    <div class="orphan-reason">${escapeHtml(orphan.reason)}</div>
+                                    <div class="orphan-path">${escapeHtml(orphan.path)}</div>
+                                </div>
+                                <button class="orphan-delete-btn" onclick="deleteOrphanFolder('${escapeHtml(orphan.path).replace(/\\/g, '\\\\')}')">
+                                    🗑️ Delete
+                                </button>
+                            </div>`;
+                    }
+                    
+                    html += '</div>';
+                    content.innerHTML = html;
+                }
+                
+            } catch (err) {
+                content.innerHTML = `
+                    <div style="text-align: center; padding: 2rem; color: #c00;">
+                        <p>⚠️ Error checking orphans</p>
+                        <p style="font-size: 0.9rem;">${escapeHtml(err.message)}</p>
+                    </div>`;
+            }
+        }
+        
+        async function deleteOrphanFolder(path) {
+            if (!confirm(`Delete this folder and all its contents?\n\n${path}\n\nThis cannot be undone!`)) {
+                return;
+            }
+            
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = '⏳ Deleting...';
+            
+            try {
+                const response = await fetch('/api/folders/delete-orphan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: path })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to delete folder');
+                }
+                
+                // Remove the item from the list
+                const item = btn.closest('.orphan-item');
+                item.style.background = '#d4edda';
+                item.innerHTML = `
+                    <div class="orphan-info">
+                        <div class="orphan-name" style="color: #155724;">✅ Deleted</div>
+                        <div class="orphan-reason">${data.files_deleted} files removed</div>
+                    </div>`;
+                
+                // Re-check after a moment to update UI
+                setTimeout(() => checkOrphanFolders(), 1500);
+                
+            } catch (err) {
+                btn.disabled = false;
+                btn.textContent = '🗑️ Delete';
+                alert('Failed to delete: ' + err.message);
+            }
+        }
+        
+        function closeOrphanModal() {
+            document.getElementById('orphan-modal').style.display = 'none';
+        }
+        
+        // ====================================================================
+        // Export Recovery
+        // ====================================================================
+        async function checkForIncompleteExport() {
+            try {
+                const response = await fetch('/api/export/recovery');
+                const data = await response.json();
+                
+                if (data.has_incomplete) {
+                    showRecoveryModal(data);
+                }
+            } catch (e) {
+                console.error('Failed to check for incomplete exports:', e);
+            }
+        }
+        
+        function showRecoveryModal(data) {
+            const modal = document.createElement('div');
+            modal.className = 'export-modal';
+            modal.id = 'recovery-modal';
+            
+            const startedDate = data.started ? new Date(data.started).toLocaleString() : 'Unknown';
+            const progress = Math.round((data.completed_pages / data.total_pages) * 100);
+            
+            modal.innerHTML = `
+                <div class="export-modal-content" style="width: 500px;">
+                    <h3>⚠️ Incomplete Export Found</h3>
+                    <div style="margin-bottom: 1rem;">
+                        <p>An export was interrupted and can be resumed:</p>
+                        <div style="background: #f8f9fa; padding: 1rem; border-radius: 4px; margin: 0.75rem 0;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                <span>Started:</span>
+                                <strong>${startedDate}</strong>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                <span>Progress:</span>
+                                <strong>${data.completed_pages} / ${data.total_pages} pages (${progress}%)</strong>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span>Remaining:</span>
+                                <strong>${data.remaining_pages} pages</strong>
+                            </div>
+                        </div>
+                        <div class="export-progress-bar" style="margin: 1rem 0;">
+                            <div class="export-progress-fill" style="width: ${progress}%"></div>
+                        </div>
+                    </div>
+                    <div class="export-modal-buttons" style="justify-content: space-between;">
+                        <button class="toolbar-btn" onclick="discardRecovery()">Discard & Start Fresh</button>
+                        <button class="toolbar-btn primary" onclick="resumeExport()">Resume Export</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            // Store recovery data for resume
+            window.recoveryData = data;
+        }
+        
+        async function resumeExport() {
+            const modal = document.getElementById('recovery-modal');
+            if (modal) modal.remove();
+            
+            if (window.recoveryData) {
+                // Find the first incomplete page to resume from
+                const completedSet = new Set(window.recoveryData.completed_page_ids);
+                const pages = window.recoveryData.pages;
+                let resumeFrom = null;
+                
+                for (const page of pages) {
+                    if (!completedSet.has(page.page_id)) {
+                        resumeFrom = page.page_id;
+                        break;
+                    }
+                }
+                
+                // Re-start export with the saved pages
+                showExportModal(window.recoveryData.remaining_pages);
+                
+                try {
+                    const startRes = await fetch('/api/export/batch/start', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            pages: window.recoveryData.pages,
+                            resume_from: resumeFrom
+                        })
+                    });
+                    
+                    const startData = await startRes.json();
+                    if (!startRes.ok) throw new Error(startData.error || 'Failed to resume export');
+                    
+                    addExportLog(`Resuming export from where it left off...`, 'info');
+                    addExportLog(`${window.recoveryData.completed_pages} pages already completed, ${window.recoveryData.remaining_pages} remaining`, 'info');
+                    
+                    const eventSource = new EventSource('/api/export/batch/stream');
+                    
+                    eventSource.onmessage = (event) => {
+                        const data = JSON.parse(event.data);
+                        handleExportEvent(data);
+                        
+                        if (data.type === 'complete' || data.type === 'cancelled' || data.type === 'error') {
+                            eventSource.close();
+                            setExportComplete(true);
+                            updateExportTree();
+                            renderNotebooks();
+                        }
+                    };
+                    
+                    eventSource.onerror = () => {
+                        eventSource.close();
+                        addExportLog('Connection lost. Export may continue in background.', 'error');
+                        setExportComplete(true);
+                    };
+                    
+                    window.currentExportStream = eventSource;
+                    
+                } catch (err) {
+                    addExportLog(`Resume failed: ${err.message}`, 'error');
+                    setExportComplete(true);
+                }
+                
+                window.recoveryData = null;
+            }
+        }
+        
+        async function discardRecovery() {
+            const modal = document.getElementById('recovery-modal');
+            if (modal) modal.remove();
+            
+            try {
+                await fetch('/api/export/recovery/clear', { method: 'POST' });
+            } catch (e) {
+                console.error('Failed to clear recovery data:', e);
+            }
+            
+            window.recoveryData = null;
+        }
+    </script>
+</body>
+</html>

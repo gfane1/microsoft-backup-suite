@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authentication - OneNote Web Exporter</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <span class="logo">📓</span>
+            <span>OneNote Web Exporter</span>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div class="auth-result card">
+            {% if success %}
+            <div class="auth-success">
+                <span class="auth-icon">✅</span>
+                <h1>Authentication Successful!</h1>
+                <p>{{ message }}</p>
+                {% if user_email %}
+                <p class="user-email">{{ user_email }}</p>
+                {% endif %}
+                <a href="{{ url_for('index') }}" class="btn btn-primary">Continue to Dashboard</a>
+            </div>
+            {% else %}
+            <div class="auth-error">
+                <span class="auth-icon">❌</span>
+                <h1>Authentication Failed</h1>
+                <p>{{ message }}</p>
+                <div class="auth-actions">
+                    <a href="{{ url_for('auth_login') }}" class="btn btn-primary">Try Again</a>
+                    <a href="{{ url_for('index') }}" class="btn btn-secondary">Back to Home</a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </main>
+
+    <footer>
+        <p>OneNote Web Exporter &copy; 2025</p>
+    </footer>
+</body>
+</html>

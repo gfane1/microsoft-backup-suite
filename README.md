@@ -35,8 +35,13 @@ Automatically backup your entire OneDrive (personal accounts) to an external dri
 - ✅ Resume capability - Stop/start anytime
 - ✅ Desktop app - GUI interface available
 
-### 📓 OneNote Exporter (WIP)
+### 📓 OneNote Exporter
+
 Export your entire OneNote notebooks with all attachments (images, audio recordings, PDFs, web links) for importing into popular note-taking apps.
+
+**Two Options Available:**
+- **CLI Version** (`onenote-exporter/`) - Command-line tool for automated exports
+- **Web UI Version** (`onenote-web-exporter/`) - Browser-based interface for exploring and exporting
 
 **Features:**
 - ✅ Exports all notebooks, sections, and pages
@@ -45,6 +50,8 @@ Export your entire OneNote notebooks with all attachments (images, audio recordi
 - ✅ Works with Joplin, Evernote, Notion, Obsidian
 - ✅ Automatic token refresh for long exports
 - ✅ Preserves metadata (dates, authors)
+- ✅ **NEW:** Web UI for browsing notebooks before export
+- ✅ **NEW:** Real-time export progress tracking
 
 ---
 
@@ -97,6 +104,15 @@ Follow prompts → Authenticate → Select drive → Choose files → Done!
 
 ### OneNote Export
 
+**Option 1: Web UI (Recommended)**
+```bash
+cd onenote-web-exporter
+pip install -r requirements.txt
+python app.py
+```
+Then open http://localhost:8080 in your browser.
+
+**Option 2: CLI**
 ```bash
 cd onenote-exporter
 python3 onenote_exporter.py
@@ -124,12 +140,20 @@ microsoft-backup-suite/
 │   ├── docs/                   # Detailed fix guides
 │   └── requirements.txt        # Dependencies
 │
-└── onenote-exporter/           # OneNote export tool
-    ├── README.md               # Main overview
-    ├── README_ONENOTE.md       # Full documentation
-    ├── QUICKSTART.md           # 5-minute setup
-    ├── MIGRATION_GUIDE.md      # App comparison
-    ├── onenote_exporter.py     # Main script
+├── onenote-exporter/           # OneNote CLI export tool
+│   ├── README.md               # Main overview
+│   ├── README_ONENOTE.md       # Full documentation
+│   ├── QUICKSTART.md           # 5-minute setup
+│   ├── MIGRATION_GUIDE.md      # App comparison
+│   ├── onenote_exporter.py     # Main CLI script
+│   └── requirements.txt        # Dependencies
+│
+└── onenote-web-exporter/       # OneNote Web UI export tool
+    ├── app.py                  # Flask web application
+    ├── graph_client.py         # Microsoft Graph API client
+    ├── exporter.py             # Export logic with progress
+    ├── templates/              # HTML templates
+    ├── static/                 # CSS and JavaScript
     └── requirements.txt        # Dependencies
 ```
 
@@ -236,18 +260,18 @@ External Drive / Import to Other Apps
 
 ## 📊 Comparison: OneDrive vs OneNote Tools
 
-| Feature | OneDrive Backup v2.0 | OneNote Exporter |
-|---------|---------------------|------------------|
-| **What it backs up** | Files & folders | Notes & notebooks |
-| **Output format** | Original files | Markdown/ENEX/HTML |
-| **Typical size** | GB to TB | MB to GB |
-| **Success rate** | 99.978% | ~99% |
-| **Backup time** | Varies (450GB ~10 hrs) | 5-30 minutes |
-| **Best for** | File preservation | Note migration |
-| **Destination** | External drive | Import to other apps |
-| **Max file size** | Unlimited (40GB+ tested) | Per OneNote limits |
-| **Resume capability** | ✅ Yes | ✅ Yes |
-| **GUI available** | ✅ Yes (Electron app) | ❌ CLI only |
+| Feature | OneDrive Backup v2.0 | OneNote CLI | OneNote Web UI |
+|---------|---------------------|-------------|----------------|
+| **What it backs up** | Files & folders | Notes & notebooks | Notes & notebooks |
+| **Output format** | Original files | Markdown/ENEX/HTML | Joplin Markdown |
+| **Typical size** | GB to TB | MB to GB | MB to GB |
+| **Success rate** | 99.978% | ~99% | ~99% |
+| **Backup time** | Varies (450GB ~10 hrs) | 5-30 minutes | 5-30 minutes |
+| **Best for** | File preservation | Automated exports | Browse & export |
+| **Destination** | External drive | Import to other apps | Import to Joplin |
+| **Max file size** | Unlimited (40GB+ tested) | Per OneNote limits | Per OneNote limits |
+| **Resume capability** | ✅ Yes | ✅ Yes | ❌ No |
+| **GUI available** | ✅ Yes (Electron app) | ❌ CLI only | ✅ Yes (Web UI) |
 
 ---
 

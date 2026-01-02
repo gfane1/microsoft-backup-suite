@@ -1,0 +1,5 @@
+# OneNote Web Exporter Dependencies
+flask>=3.0.0
+flask-cors>=4.0.0
+requests>=2.31.0
+waitress>=3.0.0

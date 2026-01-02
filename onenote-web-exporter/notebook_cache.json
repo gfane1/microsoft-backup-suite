@@ -1,0 +1,752 @@
+{
+  "version": 1,
+  "user_id": "08d920d53bd712c4",
+  "user_email": "geoff.fane@hotmail.com",
+  "last_full_refresh": "2026-01-02T15:07:54.346189",
+  "notebooks": {
+    "0-8D920D53BD712C4!s1c408ef32d194aaaae7fa3fb035c5acd": {
+      "id": "0-8D920D53BD712C4!s1c408ef32d194aaaae7fa3fb035c5acd",
+      "name": "Archieve",
+      "created": "2025-12-30T02:30:01Z",
+      "modified": "2025-12-30T02:30:01Z",
+      "cached_at": "2026-01-02T15:07:54.346189",
+      "section_count": null,
+      "page_count": null
+    },
+    "0-8D920D53BD712C4!22981": {
+      "id": "0-8D920D53BD712C4!22981",
+      "name": "Environment _ Energy",
+      "created": "2016-10-10T09:42:22Z",
+      "modified": "2016-10-10T09:42:22Z",
+      "cached_at": "2026-01-02T15:07:54.346189",
+      "section_count": 5,
+      "page_count": null,
+      "sections_cached_at": "2026-01-02T19:43:11.681162"
+    },
+    "0-8D920D53BD712C4!s71522fcf959f44b7b144b9a1716e33ec": {
+      "id": "0-8D920D53BD712C4!s71522fcf959f44b7b144b9a1716e33ec",
+      "name": "Finance",
+      "created": "2025-12-30T02:34:14Z",
+      "modified": "2025-12-30T02:34:14Z",
+      "cached_at": "2026-01-02T15:07:54.346189",
+      "section_count": null,
+      "page_count": null
+    },
+    "0-8D920D53BD712C4!sc89049317cbf4cfc8bba88da5efdb7ca": {
+      "id": "0-8D920D53BD712C4!sc89049317cbf4cfc8bba88da5efdb7ca",
+      "name": "Meaning",
+      "created": "2025-12-31T03:40:49Z",
+      "modified": "2025-12-31T03:40:49Z",
+      "cached_at": "2026-01-02T15:07:54.346189",
+      "section_count": null,
+      "page_count": null
+    },
+    "0-8D920D53BD712C4!239": {
+      "id": "0-8D920D53BD712C4!239",
+      "name": "Personal (Web)",
+      "created": "2012-10-16T19:10:54Z",
+      "modified": "2014-06-06T09:38:15Z",
+      "cached_at": "2026-01-02T15:07:54.346189",
+      "section_count": null,
+      "page_count": null
+    },
+    "0-8D920D53BD712C4!7302": {
+      "id": "0-8D920D53BD712C4!7302",
+      "name": "Reasearch",
+      "created": "2014-06-07T01:37:43Z",
+      "modified": "2014-06-07T01:37:43Z",
+      "cached_at": "2026-01-02T15:07:54.346189",
+      "section_count": null,
+      "page_count": null
+    },
+    "0-8D920D53BD712C4!sb1178d4907964fc1b9e52f812e5a6ac5": {
+      "id": "0-8D920D53BD712C4!sb1178d4907964fc1b9e52f812e5a6ac5",
+      "name": "Temp",
+      "created": "2025-12-27T02:34:30Z",
+      "modified": "2025-12-27T02:34:30Z",
+      "cached_at": "2026-01-02T15:07:54.346189",
+      "section_count": 2,
+      "page_count": null,
+      "sections_cached_at": "2026-01-02T15:08:04.571810"
+    },
+    "0-8D920D53BD712C4!7516": {
+      "id": "0-8D920D53BD712C4!7516",
+      "name": "Todo",
+      "created": "2014-06-09T18:37:31Z",
+      "modified": "2014-06-09T18:37:31Z",
+      "cached_at": "2026-01-02T15:07:54.346189",
+      "section_count": 2,
+      "page_count": null,
+      "sections_cached_at": "2026-01-02T18:40:02.234950"
+    },
+    "0-8D920D53BD712C4!7291": {
+      "id": "0-8D920D53BD712C4!7291",
+      "name": "Work",
+      "created": "2014-06-07T01:25:52Z",
+      "modified": "2014-06-07T01:25:52Z",
+      "cached_at": "2026-01-02T15:07:54.346189",
+      "section_count": null,
+      "page_count": null
+    }
+  },
+  "sections": {
+    "0-8D920D53BD712C4!sb1178d4907964fc1b9e52f812e5a6ac5": {
+      "0-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c": {
+        "id": "0-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+        "name": "Meetings",
+        "created": "2025-12-27T03:22:06Z",
+        "modified": "2026-01-01T15:48:25Z",
+        "notebook_id": "0-8D920D53BD712C4!sb1178d4907964fc1b9e52f812e5a6ac5",
+        "cached_at": "2026-01-02T15:08:04.571810",
+        "page_count": 8,
+        "pages_cached_at": "2026-01-02T15:08:19.142608"
+      },
+      "0-8D920D53BD712C4!s335050ea85e240768d8ae99ae4350b89": {
+        "id": "0-8D920D53BD712C4!s335050ea85e240768d8ae99ae4350b89",
+        "name": "New Section 1",
+        "created": "2025-12-27T02:34:55Z",
+        "modified": "2026-01-02T03:53:30Z",
+        "notebook_id": "0-8D920D53BD712C4!sb1178d4907964fc1b9e52f812e5a6ac5",
+        "cached_at": "2026-01-02T15:08:04.571810",
+        "page_count": 4,
+        "pages_cached_at": "2026-01-02T19:53:00.591914"
+      }
+    },
+    "0-8D920D53BD712C4!7516": {
+      "0-8D920D53BD712C4!7519": {
+        "id": "0-8D920D53BD712C4!7519",
+        "name": "Home",
+        "created": "2014-06-09T18:37:57Z",
+        "modified": "2026-01-01T15:47:27Z",
+        "notebook_id": "0-8D920D53BD712C4!7516",
+        "cached_at": "2026-01-02T18:40:02.234950",
+        "page_count": 1,
+        "pages_cached_at": "2026-01-02T18:40:17.275016"
+      },
+      "0-8D920D53BD712C4!7518": {
+        "id": "0-8D920D53BD712C4!7518",
+        "name": "Work",
+        "created": "2014-06-09T18:37:56Z",
+        "modified": "2015-11-22T11:07:06Z",
+        "notebook_id": "0-8D920D53BD712C4!7516",
+        "cached_at": "2026-01-02T18:40:02.234950",
+        "page_count": 2,
+        "pages_cached_at": "2026-01-02T18:40:34.539414"
+      }
+    },
+    "0-8D920D53BD712C4!22981": {
+      "0-8D920D53BD712C4!22987": {
+        "id": "0-8D920D53BD712C4!22987",
+        "name": "Architecture",
+        "created": "2016-10-10T09:43:31Z",
+        "modified": "2022-07-26T05:53:56Z",
+        "notebook_id": "0-8D920D53BD712C4!22981",
+        "cached_at": "2026-01-02T19:43:11.681162",
+        "page_count": 2,
+        "pages_cached_at": "2026-01-02T19:43:43.183775"
+      },
+      "0-8D920D53BD712C4!22988": {
+        "id": "0-8D920D53BD712C4!22988",
+        "name": "ERIN",
+        "created": "2016-10-10T09:43:38Z",
+        "modified": "2022-07-26T05:53:56Z",
+        "notebook_id": "0-8D920D53BD712C4!22981",
+        "cached_at": "2026-01-02T19:43:11.681162",
+        "page_count": null
+      },
+      "0-8D920D53BD712C4!22989": {
+        "id": "0-8D920D53BD712C4!22989",
+        "name": "General",
+        "created": "2016-10-10T09:48:30Z",
+        "modified": "2022-07-26T05:53:58Z",
+        "notebook_id": "0-8D920D53BD712C4!22981",
+        "cached_at": "2026-01-02T19:43:11.681162",
+        "page_count": null
+      },
+      "0-8D920D53BD712C4!22986": {
+        "id": "0-8D920D53BD712C4!22986",
+        "name": "Initiatives",
+        "created": "2016-10-10T09:43:28Z",
+        "modified": "2022-07-26T05:53:55Z",
+        "notebook_id": "0-8D920D53BD712C4!22981",
+        "cached_at": "2026-01-02T19:43:11.681162",
+        "page_count": null
+      },
+      "0-8D920D53BD712C4!22985": {
+        "id": "0-8D920D53BD712C4!22985",
+        "name": "Meetings",
+        "created": "2016-10-10T09:43:26Z",
+        "modified": "2022-07-26T07:23:44Z",
+        "notebook_id": "0-8D920D53BD712C4!22981",
+        "cached_at": "2026-01-02T19:43:11.681162",
+        "page_count": null
+      }
+    }
+  },
+  "pages": {
+    "0-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c": {
+      "0-42c6101692f042959c901a80a0457d9b!34-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c": {
+        "id": "0-42c6101692f042959c901a80a0457d9b!34-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+        "title": "ITB Meeting re Data Strategy",
+        "created": "2016-10-10T09:42:17Z",
+        "modified": "2022-07-26T05:48:06Z",
+        "level": 0,
+        "order": 0,
+        "section_id": "0-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+        "cached_at": "2026-01-02T15:08:19.142608",
+        "exported_at": "2026-01-02T20:32:21.287983",
+        "export_path": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\ITB Meeting re Data Strategy_2.md"
+      },
+      "0-42c6101692f042959c901a80a0457d9b!30-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c": {
+        "id": "0-42c6101692f042959c901a80a0457d9b!30-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+        "title": "SPRAT Overview with Jin",
+        "created": "2016-10-12T22:01:38Z",
+        "modified": "2022-07-26T05:48:06Z",
+        "level": 0,
+        "order": 0,
+        "section_id": "0-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+        "cached_at": "2026-01-02T15:08:19.142608",
+        "exported_at": "2026-01-02T20:32:26.939820",
+        "export_path": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\SPRAT Overview with Jin_2.md"
+      },
+      "0-42c6101692f042959c901a80a0457d9b!31-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c": {
+        "id": "0-42c6101692f042959c901a80a0457d9b!31-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+        "title": "TEAM Meeting",
+        "created": "2016-10-13T00:33:03Z",
+        "modified": "2022-07-26T05:48:06Z",
+        "level": 0,
+        "order": 0,
+        "section_id": "0-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+        "cached_at": "2026-01-02T15:08:19.142608",
+        "exported_at": "2026-01-02T20:32:32.466178",
+        "export_path": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\TEAM Meeting_2.md"
+      },
+      "0-42c6101692f042959c901a80a0457d9b!35-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c": {
+        "id": "0-42c6101692f042959c901a80a0457d9b!35-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+        "title": "Carpenter Risk Mitigation Workshop",
+        "created": "2016-10-25T21:41:27Z",
+        "modified": "2022-07-26T05:48:06Z",
+        "level": 0,
+        "order": 0,
+        "section_id": "0-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+        "cached_at": "2026-01-02T15:08:19.142608",
+        "exported_at": "2026-01-02T20:32:51.336430",
+        "export_path": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\Carpenter Risk Mitigation Workshop_4.md"
+      },
+      "0-42c6101692f042959c901a80a0457d9b!32-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c": {
+        "id": "0-42c6101692f042959c901a80a0457d9b!32-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+        "title": "Open Data Community Forum",
+        "created": "2016-11-22T23:23:27Z",
+        "modified": "2022-07-26T05:48:06Z",
+        "level": 0,
+        "order": 0,
+        "section_id": "0-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+        "cached_at": "2026-01-02T15:08:19.142608",
+        "exported_at": "2026-01-02T20:32:56.132519",
+        "export_path": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\Open Data Community Forum_2.md"
+      },
+      "0-42c6101692f042959c901a80a0457d9b!28-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c": {
+        "id": "0-42c6101692f042959c901a80a0457d9b!28-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+        "title": "Catch-up with Scott Wood",
+        "created": "2017-02-12T23:18:21Z",
+        "modified": "2022-07-26T05:48:06Z",
+        "level": 0,
+        "order": 0,
+        "section_id": "0-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+        "cached_at": "2026-01-02T15:08:19.142608",
+        "exported_at": "2026-01-02T20:33:03.730866",
+        "export_path": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\Catch-up with Scott Wood_2.md"
+      },
+      "0-42c6101692f042959c901a80a0457d9b!29-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c": {
+        "id": "0-42c6101692f042959c901a80a0457d9b!29-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+        "title": "*re Jeannette the omit So w. Robinson Ryan-rs E* Asif  Salt, Matt",
+        "created": "2017-02-24T02:01:04Z",
+        "modified": "2022-07-26T05:48:06Z",
+        "level": 0,
+        "order": 0,
+        "section_id": "0-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+        "cached_at": "2026-01-02T15:08:19.142608",
+        "exported_at": "2026-01-02T20:33:06.730872",
+        "export_path": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\_re Jeannette the omit So w. Robinson Ryan-rs E_ Asif  Salt, Matt_2.md"
+      },
+      "0-42c6101692f042959c901a80a0457d9b!33-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c": {
+        "id": "0-42c6101692f042959c901a80a0457d9b!33-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+        "title": "Meeting with Scott",
+        "created": "2017-03-08T23:02:49.245Z",
+        "modified": "2022-07-26T05:48:06Z",
+        "level": 0,
+        "order": 0,
+        "section_id": "0-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+        "cached_at": "2026-01-02T15:08:19.142608",
+        "exported_at": "2026-01-02T20:33:09.219326",
+        "export_path": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\Meeting with Scott_2.md"
+      }
+    },
+    "0-8D920D53BD712C4!7519": {
+      "0-1219f51f520b4be5b021d900b962c6aa!1-8D920D53BD712C4!7519": {
+        "id": "0-1219f51f520b4be5b021d900b962c6aa!1-8D920D53BD712C4!7519",
+        "title": "",
+        "created": "2014-06-09T18:37:50.982Z",
+        "modified": "2014-06-09T18:37:50.982Z",
+        "level": 0,
+        "order": 0,
+        "section_id": "0-8D920D53BD712C4!7519",
+        "cached_at": "2026-01-02T18:40:17.275016",
+        "exported_at": "2026-01-02T20:19:48.797690",
+        "export_path": "c:\\OneNote-Exports\\OneNote_Export\\Todo\\Home\\Untitled_1.md"
+      }
+    },
+    "0-8D920D53BD712C4!7518": {
+      "0-0e470589b0e64e2686e3bf44e7c6b9aa!1-8D920D53BD712C4!7518": {
+        "id": "0-0e470589b0e64e2686e3bf44e7c6b9aa!1-8D920D53BD712C4!7518",
+        "title": "Presentation ",
+        "created": "2014-06-09T18:37:31Z",
+        "modified": "2014-06-09T20:09:12Z",
+        "level": 0,
+        "order": 0,
+        "section_id": "0-8D920D53BD712C4!7518",
+        "cached_at": "2026-01-02T18:40:34.539414",
+        "exported_at": "2026-01-02T20:19:54.830580",
+        "export_path": "c:\\OneNote-Exports\\OneNote_Export\\Todo\\Work\\Presentation_1.md"
+      },
+      "0-43c09c1ba50e472aae4e2f6ff014c8a0!1-8D920D53BD712C4!7518": {
+        "id": "0-43c09c1ba50e472aae4e2f6ff014c8a0!1-8D920D53BD712C4!7518",
+        "title": "To do Template",
+        "created": "2014-06-09T18:37:31Z",
+        "modified": "2014-06-09T20:00:58Z",
+        "level": 0,
+        "order": 0,
+        "section_id": "0-8D920D53BD712C4!7518",
+        "cached_at": "2026-01-02T18:40:34.539414",
+        "exported_at": "2026-01-02T20:19:58.573582",
+        "export_path": "c:\\OneNote-Exports\\OneNote_Export\\Todo\\Work\\To do Template_1.md"
+      }
+    },
+    "0-8D920D53BD712C4!22987": {
+      "0-b1168c03ca024ca6ace8bf63c131e2cb!1-8D920D53BD712C4!22987": {
+        "id": "0-b1168c03ca024ca6ace8bf63c131e2cb!1-8D920D53BD712C4!22987",
+        "title": "EA Domains and Sub Domains",
+        "created": "2016-10-10T09:54:07.797Z",
+        "modified": "2022-07-26T05:48:14Z",
+        "level": 0,
+        "order": 0,
+        "section_id": "0-8D920D53BD712C4!22987",
+        "cached_at": "2026-01-02T19:43:43.183775",
+        "exported_at": "2026-01-02T19:45:41.489824",
+        "export_path": "c:\\OneNote-Exports\\OneNote_Export\\Environment _ Energy\\Architecture\\EA Domains and Sub Domains.md"
+      },
+      "0-f519d0bc27b948c8b1978057eb0dad26!1-8D920D53BD712C4!22987": {
+        "id": "0-f519d0bc27b948c8b1978057eb0dad26!1-8D920D53BD712C4!22987",
+        "title": "Robinson Ryan Report - Review EA and Information Management",
+        "created": "2016-10-10T09:42:35.32Z",
+        "modified": "2022-07-26T05:48:14Z",
+        "level": 0,
+        "order": 0,
+        "section_id": "0-8D920D53BD712C4!22987",
+        "cached_at": "2026-01-02T19:43:43.183775",
+        "exported_at": "2026-01-02T19:45:47.054531",
+        "export_path": "c:\\OneNote-Exports\\OneNote_Export\\Environment _ Energy\\Architecture\\Robinson Ryan Report - Review EA and Information Management.md"
+      }
+    },
+    "0-8D920D53BD712C4!s335050ea85e240768d8ae99ae4350b89": {
+      "0-9e0f5cfe3a1c4cd0886f2d45b9759905!1-8D920D53BD712C4!s335050ea85e240768d8ae99ae4350b89": {
+        "id": "0-9e0f5cfe3a1c4cd0886f2d45b9759905!1-8D920D53BD712C4!s335050ea85e240768d8ae99ae4350b89",
+        "title": "",
+        "created": "2026-01-02T00:27:16.92Z",
+        "modified": "2026-01-02T03:53:13Z",
+        "level": 0,
+        "order": 0,
+        "section_id": "0-8D920D53BD712C4!s335050ea85e240768d8ae99ae4350b89",
+        "cached_at": "2026-01-02T19:53:00.591914",
+        "exported_at": "2026-01-02T20:33:14.049846",
+        "export_path": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\New Section 1\\Untitled_1.md"
+      },
+      "0-6ea4bd9446374ac4be57026ffad8f356!1-8D920D53BD712C4!s335050ea85e240768d8ae99ae4350b89": {
+        "id": "0-6ea4bd9446374ac4be57026ffad8f356!1-8D920D53BD712C4!s335050ea85e240768d8ae99ae4350b89",
+        "title": "Seana Zelazo",
+        "created": "2026-01-02T00:38:42.33Z",
+        "modified": "2026-01-02T00:38:55Z",
+        "level": 0,
+        "order": 0,
+        "section_id": "0-8D920D53BD712C4!s335050ea85e240768d8ae99ae4350b89",
+        "cached_at": "2026-01-02T19:53:00.591914",
+        "exported_at": "2026-01-02T20:33:17.478112",
+        "export_path": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\New Section 1\\Seana Zelazo_1.md"
+      },
+      "0-8279e1971b3f45bfb18acf2676c061a4!1-8D920D53BD712C4!s335050ea85e240768d8ae99ae4350b89": {
+        "id": "0-8279e1971b3f45bfb18acf2676c061a4!1-8D920D53BD712C4!s335050ea85e240768d8ae99ae4350b89",
+        "title": "Temp",
+        "created": "2025-12-27T02:34:40Z",
+        "modified": "2026-01-01T15:48:08Z",
+        "level": 0,
+        "order": 0,
+        "section_id": "0-8D920D53BD712C4!s335050ea85e240768d8ae99ae4350b89",
+        "cached_at": "2026-01-02T19:53:00.591914",
+        "exported_at": "2026-01-02T20:33:22.139501",
+        "export_path": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\New Section 1\\Temp_1.md"
+      },
+      "0-76f8683dffa34ae4872fbecbd1497a1f!1-8D920D53BD712C4!s335050ea85e240768d8ae99ae4350b89": {
+        "id": "0-76f8683dffa34ae4872fbecbd1497a1f!1-8D920D53BD712C4!s335050ea85e240768d8ae99ae4350b89",
+        "title": "Project Shards - Training Rig",
+        "created": "2025-12-30T08:21:17.116Z",
+        "modified": "2025-12-30T08:53:32Z",
+        "level": 0,
+        "order": 0,
+        "section_id": "0-8D920D53BD712C4!s335050ea85e240768d8ae99ae4350b89",
+        "cached_at": "2026-01-02T19:53:00.591914",
+        "exported_at": "2026-01-02T20:33:25.783202",
+        "export_path": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\New Section 1\\Project Shards - Training Rig_1.md"
+      }
+    }
+  },
+  "export_history": [
+    {
+      "page_id": "0-76f8683dffa34ae4872fbecbd1497a1f!1-8D920D53BD712C4!s335050ea85e240768d8ae99ae4350b89",
+      "page_title": "Project Shards - Training Rig",
+      "notebook_name": "Temp",
+      "section_name": "New Section 1",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\New Section 1\\Project Shards - Training Rig_1.md",
+      "images": 0,
+      "image_errors": 0,
+      "exported_at": "2026-01-02T20:33:25.792198",
+      "completed_at": "2026-01-02T20:33:25.792198"
+    },
+    {
+      "page_id": "0-8279e1971b3f45bfb18acf2676c061a4!1-8D920D53BD712C4!s335050ea85e240768d8ae99ae4350b89",
+      "page_title": "Temp",
+      "notebook_name": "Temp",
+      "section_name": "New Section 1",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\New Section 1\\Temp_1.md",
+      "images": 2,
+      "image_errors": 2,
+      "exported_at": "2026-01-02T20:33:22.150510",
+      "completed_at": "2026-01-02T20:33:22.150510"
+    },
+    {
+      "page_id": "0-6ea4bd9446374ac4be57026ffad8f356!1-8D920D53BD712C4!s335050ea85e240768d8ae99ae4350b89",
+      "page_title": "Seana Zelazo",
+      "notebook_name": "Temp",
+      "section_name": "New Section 1",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\New Section 1\\Seana Zelazo_1.md",
+      "images": 1,
+      "image_errors": 1,
+      "exported_at": "2026-01-02T20:33:17.483123",
+      "completed_at": "2026-01-02T20:33:17.483123"
+    },
+    {
+      "page_id": "0-9e0f5cfe3a1c4cd0886f2d45b9759905!1-8D920D53BD712C4!s335050ea85e240768d8ae99ae4350b89",
+      "page_title": "Untitled",
+      "notebook_name": "Temp",
+      "section_name": "New Section 1",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\New Section 1\\Untitled_1.md",
+      "images": 2,
+      "image_errors": 2,
+      "exported_at": "2026-01-02T20:33:14.053839",
+      "completed_at": "2026-01-02T20:33:14.053839"
+    },
+    {
+      "page_id": "0-42c6101692f042959c901a80a0457d9b!33-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+      "page_title": "Meeting with Scott",
+      "notebook_name": "Temp",
+      "section_name": "Meetings",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\Meeting with Scott_2.md",
+      "images": 0,
+      "image_errors": 0,
+      "exported_at": "2026-01-02T20:33:09.225326",
+      "completed_at": "2026-01-02T20:33:09.225326"
+    },
+    {
+      "page_id": "0-42c6101692f042959c901a80a0457d9b!29-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+      "page_title": "*re Jeannette the omit So w. Robinson Ryan-rs E* Asif  Salt, Matt",
+      "notebook_name": "Temp",
+      "section_name": "Meetings",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\_re Jeannette the omit So w. Robinson Ryan-rs E_ Asif  Salt, Matt_2.md",
+      "images": 0,
+      "image_errors": 0,
+      "exported_at": "2026-01-02T20:33:06.736667",
+      "completed_at": "2026-01-02T20:33:06.736667"
+    },
+    {
+      "page_id": "0-42c6101692f042959c901a80a0457d9b!28-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+      "page_title": "Catch-up with Scott Wood",
+      "notebook_name": "Temp",
+      "section_name": "Meetings",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\Catch-up with Scott Wood_2.md",
+      "images": 0,
+      "image_errors": 0,
+      "exported_at": "2026-01-02T20:33:03.734871",
+      "completed_at": "2026-01-02T20:33:03.734871"
+    },
+    {
+      "page_id": "0-42c6101692f042959c901a80a0457d9b!32-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+      "page_title": "Open Data Community Forum",
+      "notebook_name": "Temp",
+      "section_name": "Meetings",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\Open Data Community Forum_2.md",
+      "images": 0,
+      "image_errors": 0,
+      "exported_at": "2026-01-02T20:32:56.135615",
+      "completed_at": "2026-01-02T20:32:56.135615"
+    },
+    {
+      "page_id": "0-42c6101692f042959c901a80a0457d9b!35-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+      "page_title": "Carpenter Risk Mitigation Workshop",
+      "notebook_name": "Temp",
+      "section_name": "Meetings",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\Carpenter Risk Mitigation Workshop_4.md",
+      "images": 19,
+      "image_errors": 19,
+      "exported_at": "2026-01-02T20:32:51.338430",
+      "completed_at": "2026-01-02T20:32:51.338430"
+    },
+    {
+      "page_id": "0-42c6101692f042959c901a80a0457d9b!31-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+      "page_title": "TEAM Meeting",
+      "notebook_name": "Temp",
+      "section_name": "Meetings",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\TEAM Meeting_2.md",
+      "images": 0,
+      "image_errors": 0,
+      "exported_at": "2026-01-02T20:32:32.469180",
+      "completed_at": "2026-01-02T20:32:32.469180"
+    },
+    {
+      "page_id": "0-42c6101692f042959c901a80a0457d9b!30-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+      "page_title": "SPRAT Overview with Jin",
+      "notebook_name": "Temp",
+      "section_name": "Meetings",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\SPRAT Overview with Jin_2.md",
+      "images": 0,
+      "image_errors": 0,
+      "exported_at": "2026-01-02T20:32:26.943807",
+      "completed_at": "2026-01-02T20:32:26.943807"
+    },
+    {
+      "page_id": "0-42c6101692f042959c901a80a0457d9b!34-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+      "page_title": "ITB Meeting re Data Strategy",
+      "notebook_name": "Temp",
+      "section_name": "Meetings",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\ITB Meeting re Data Strategy_2.md",
+      "images": 0,
+      "image_errors": 0,
+      "exported_at": "2026-01-02T20:32:21.291996",
+      "completed_at": "2026-01-02T20:32:21.291996"
+    },
+    {
+      "page_id": "0-43c09c1ba50e472aae4e2f6ff014c8a0!1-8D920D53BD712C4!7518",
+      "page_title": "To do Template",
+      "notebook_name": "Todo",
+      "section_name": "Work",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Todo\\Work\\To do Template_1.md",
+      "images": 1,
+      "image_errors": 1,
+      "exported_at": "2026-01-02T20:19:58.576585",
+      "completed_at": "2026-01-02T20:19:58.576585"
+    },
+    {
+      "page_id": "0-0e470589b0e64e2686e3bf44e7c6b9aa!1-8D920D53BD712C4!7518",
+      "page_title": "Presentation ",
+      "notebook_name": "Todo",
+      "section_name": "Work",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Todo\\Work\\Presentation_1.md",
+      "images": 1,
+      "image_errors": 1,
+      "exported_at": "2026-01-02T20:19:54.834581",
+      "completed_at": "2026-01-02T20:19:54.835588"
+    },
+    {
+      "page_id": "0-1219f51f520b4be5b021d900b962c6aa!1-8D920D53BD712C4!7519",
+      "page_title": "Untitled",
+      "notebook_name": "Todo",
+      "section_name": "Home",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Todo\\Home\\Untitled_1.md",
+      "images": 0,
+      "image_errors": 0,
+      "exported_at": "2026-01-02T20:19:48.800205",
+      "completed_at": "2026-01-02T20:19:48.800205"
+    },
+    {
+      "page_id": "0-76f8683dffa34ae4872fbecbd1497a1f!1-8D920D53BD712C4!s335050ea85e240768d8ae99ae4350b89",
+      "page_title": "Project Shards - Training Rig",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\New Section 1\\Project Shards - Training Rig.md",
+      "exported_at": "2026-01-02T19:54:15.936654",
+      "completed_at": "2026-01-02T19:54:15.936654"
+    },
+    {
+      "page_id": "0-8279e1971b3f45bfb18acf2676c061a4!1-8D920D53BD712C4!s335050ea85e240768d8ae99ae4350b89",
+      "page_title": "Temp",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\New Section 1\\Temp.md",
+      "exported_at": "2026-01-02T19:54:11.606392",
+      "completed_at": "2026-01-02T19:54:11.606392"
+    },
+    {
+      "page_id": "0-6ea4bd9446374ac4be57026ffad8f356!1-8D920D53BD712C4!s335050ea85e240768d8ae99ae4350b89",
+      "page_title": "Seana Zelazo",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\New Section 1\\Seana Zelazo.md",
+      "exported_at": "2026-01-02T19:54:08.503725",
+      "completed_at": "2026-01-02T19:54:08.503725"
+    },
+    {
+      "page_id": "0-9e0f5cfe3a1c4cd0886f2d45b9759905!1-8D920D53BD712C4!s335050ea85e240768d8ae99ae4350b89",
+      "page_title": "Untitled",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\New Section 1\\Untitled.md",
+      "exported_at": "2026-01-02T19:54:04.650310",
+      "completed_at": "2026-01-02T19:54:04.650310"
+    },
+    {
+      "page_id": "0-42c6101692f042959c901a80a0457d9b!33-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+      "page_title": "Meeting with Scott",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\Meeting with Scott_1.md",
+      "exported_at": "2026-01-02T19:54:00.177935",
+      "completed_at": "2026-01-02T19:54:00.177935"
+    },
+    {
+      "page_id": "0-42c6101692f042959c901a80a0457d9b!29-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+      "page_title": "*re Jeannette the omit So w. Robinson Ryan-rs E* Asif  Salt, Matt",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\_re Jeannette the omit So w. Robinson Ryan-rs E_ Asif  Salt, Matt_1.md",
+      "exported_at": "2026-01-02T19:53:57.475993",
+      "completed_at": "2026-01-02T19:53:57.475993"
+    },
+    {
+      "page_id": "0-42c6101692f042959c901a80a0457d9b!28-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+      "page_title": "Catch-up with Scott Wood",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\Catch-up with Scott Wood_1.md",
+      "exported_at": "2026-01-02T19:53:54.331042",
+      "completed_at": "2026-01-02T19:53:54.331042"
+    },
+    {
+      "page_id": "0-42c6101692f042959c901a80a0457d9b!32-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+      "page_title": "Open Data Community Forum",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\Open Data Community Forum_1.md",
+      "exported_at": "2026-01-02T19:53:46.205308",
+      "completed_at": "2026-01-02T19:53:46.205308"
+    },
+    {
+      "page_id": "0-42c6101692f042959c901a80a0457d9b!35-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+      "page_title": "Carpenter Risk Mitigation Workshop",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\Carpenter Risk Mitigation Workshop_3.md",
+      "exported_at": "2026-01-02T19:53:36.354339",
+      "completed_at": "2026-01-02T19:53:36.354339"
+    },
+    {
+      "page_id": "0-42c6101692f042959c901a80a0457d9b!31-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+      "page_title": "TEAM Meeting",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\TEAM Meeting_1.md",
+      "exported_at": "2026-01-02T19:53:33.130376",
+      "completed_at": "2026-01-02T19:53:33.130376"
+    },
+    {
+      "page_id": "0-42c6101692f042959c901a80a0457d9b!30-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+      "page_title": "SPRAT Overview with Jin",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\SPRAT Overview with Jin_1.md",
+      "exported_at": "2026-01-02T19:53:26.625726",
+      "completed_at": "2026-01-02T19:53:26.625726"
+    },
+    {
+      "page_id": "0-42c6101692f042959c901a80a0457d9b!34-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+      "page_title": "ITB Meeting re Data Strategy",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\ITB Meeting re Data Strategy_1.md",
+      "exported_at": "2026-01-02T19:53:19.378869",
+      "completed_at": "2026-01-02T19:53:19.378869"
+    },
+    {
+      "page_id": "0-f519d0bc27b948c8b1978057eb0dad26!1-8D920D53BD712C4!22987",
+      "page_title": "Robinson Ryan Report - Review EA and Information Management",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Environment _ Energy\\Architecture\\Robinson Ryan Report - Review EA and Information Management.md",
+      "exported_at": "2026-01-02T19:45:47.056532",
+      "completed_at": "2026-01-02T19:45:47.056532"
+    },
+    {
+      "page_id": "0-b1168c03ca024ca6ace8bf63c131e2cb!1-8D920D53BD712C4!22987",
+      "page_title": "EA Domains and Sub Domains",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Environment _ Energy\\Architecture\\EA Domains and Sub Domains.md",
+      "exported_at": "2026-01-02T19:45:41.492818",
+      "completed_at": "2026-01-02T19:45:41.492818"
+    },
+    {
+      "page_id": "0-43c09c1ba50e472aae4e2f6ff014c8a0!1-8D920D53BD712C4!7518",
+      "page_title": "To do Template",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Todo\\Work\\To do Template.md",
+      "exported_at": "2026-01-02T18:42:29.787253",
+      "completed_at": "2026-01-02T18:42:29.787253"
+    },
+    {
+      "page_id": "0-0e470589b0e64e2686e3bf44e7c6b9aa!1-8D920D53BD712C4!7518",
+      "page_title": "Presentation ",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Todo\\Work\\Presentation.md",
+      "exported_at": "2026-01-02T18:42:26.260648",
+      "completed_at": "2026-01-02T18:42:26.260648"
+    },
+    {
+      "page_id": "0-1219f51f520b4be5b021d900b962c6aa!1-8D920D53BD712C4!7519",
+      "page_title": "Untitled",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Todo\\Home\\Untitled.md",
+      "exported_at": "2026-01-02T18:42:21.776583",
+      "completed_at": "2026-01-02T18:42:21.776583"
+    },
+    {
+      "page_id": "0-42c6101692f042959c901a80a0457d9b!33-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+      "page_title": "Meeting with Scott",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\Meeting with Scott.md",
+      "exported_at": "2026-01-02T18:42:16.653086",
+      "completed_at": "2026-01-02T18:42:16.653086"
+    },
+    {
+      "page_id": "0-42c6101692f042959c901a80a0457d9b!29-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+      "page_title": "*re Jeannette the omit So w. Robinson Ryan-rs E* Asif  Salt, Matt",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\_re Jeannette the omit So w. Robinson Ryan-rs E_ Asif  Salt, Matt.md",
+      "exported_at": "2026-01-02T18:42:11.142508",
+      "completed_at": "2026-01-02T18:42:11.142508"
+    },
+    {
+      "page_id": "0-42c6101692f042959c901a80a0457d9b!28-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+      "page_title": "Catch-up with Scott Wood",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\Catch-up with Scott Wood.md",
+      "exported_at": "2026-01-02T18:42:05.153637",
+      "completed_at": "2026-01-02T18:42:05.153637"
+    },
+    {
+      "page_id": "0-42c6101692f042959c901a80a0457d9b!32-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+      "page_title": "Open Data Community Forum",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\Open Data Community Forum.md",
+      "exported_at": "2026-01-02T18:41:59.491783",
+      "completed_at": "2026-01-02T18:41:59.491783"
+    },
+    {
+      "page_id": "0-42c6101692f042959c901a80a0457d9b!35-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+      "page_title": "Carpenter Risk Mitigation Workshop",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\Carpenter Risk Mitigation Workshop_2.md",
+      "exported_at": "2026-01-02T18:41:48.267799",
+      "completed_at": "2026-01-02T18:41:48.267799"
+    },
+    {
+      "page_id": "0-42c6101692f042959c901a80a0457d9b!31-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+      "page_title": "TEAM Meeting",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\TEAM Meeting.md",
+      "exported_at": "2026-01-02T18:41:42.494217",
+      "completed_at": "2026-01-02T18:41:42.494217"
+    },
+    {
+      "page_id": "0-42c6101692f042959c901a80a0457d9b!30-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+      "page_title": "SPRAT Overview with Jin",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\SPRAT Overview with Jin.md",
+      "exported_at": "2026-01-02T18:41:34.915866",
+      "completed_at": "2026-01-02T18:41:34.915866"
+    },
+    {
+      "page_id": "0-42c6101692f042959c901a80a0457d9b!34-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+      "page_title": "ITB Meeting re Data Strategy",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\ITB Meeting re Data Strategy.md",
+      "exported_at": "2026-01-02T18:41:27.336660",
+      "completed_at": "2026-01-02T18:41:27.336660"
+    },
+    {
+      "page_id": "0-42c6101692f042959c901a80a0457d9b!35-8D920D53BD712C4!s1214251aac254dd5bc9509c690418e3c",
+      "page_title": "Carpenter Risk Mitigation Workshop",
+      "output_file": "c:\\OneNote-Exports\\OneNote_Export\\Temp\\Meetings\\Carpenter Risk Mitigation Workshop_1.md",
+      "exported_at": "2026-01-02T15:28:06.218010",
+      "completed_at": "2026-01-02T15:28:06.218010"
+    }
+  ],
+  "export_progress": null
+}

@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Export - OneNote Web Exporter</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <span class="logo">📓</span>
+            <span>OneNote Web Exporter</span>
+        </div>
+        <div class="nav-links">
+            <a href="{{ url_for('index') }}">Home</a>
+            <a href="{{ url_for('browse_page') }}">Browse</a>
+            <a href="{{ url_for('export_page') }}" class="active">Export</a>
+            <a href="{{ url_for('settings_page') }}">Settings</a>
+        </div>
+    </nav>
+
+    <main class="container">
+        <h1>📥 Export Notebooks</h1>
+        
+        <!-- Export Setup -->
+        <div id="export-setup" class="card">
+            <h2>Select Notebooks to Export</h2>
+            
+            <div id="notebooks-loading" class="loading">
+                <div class="spinner"></div>
+                <p>Loading notebooks...</p>
+            </div>
+            
+            <div id="notebooks-selection" class="hidden">
+                <div class="selection-header">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="select-all" onchange="toggleSelectAll()">
+                        <span>Select All Notebooks</span>
+                    </label>
+                </div>
+                
+                <div id="notebook-checkboxes" class="notebook-selection-list">
+                    <!-- Populated by JS -->
+                </div>
+                
+                <div class="form-group">
+                    <label for="export-folder">Export Folder</label>
+                    <input type="text" id="export-folder" placeholder="C:\OneNote-Exports">
+                </div>
+                
+                <div class="form-actions">
+                    <button id="start-export-btn" class="btn btn-primary btn-large" onclick="startExport()">
+                        🚀 Start Export
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Export Progress -->
+        <div id="export-progress" class="card hidden">
+            <h2>📊 Export Progress</h2>
+            
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+                </div>
+                <span id="progress-percent">0%</span>
+            </div>
+            
+            <div class="progress-stats">
+                <div class="stat">
+                    <span class="stat-label">Stage</span>
+                    <span id="stat-stage" class="stat-value">-</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Current</span>
+                    <span id="stat-current" class="stat-value">-</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Notebook</span>
+                    <span id="stat-notebook" class="stat-value">-</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Section</span>
+                    <span id="stat-section" class="stat-value">-</span>
+                </div>
+            </div>
+            
+            <div id="progress-log" class="progress-log">
+                <!-- Log entries added here -->
+            </div>
+            
+            <div class="form-actions">
+                <button id="cancel-export-btn" class="btn btn-danger" onclick="cancelExport()">
+                    ❌ Cancel Export
+                </button>
+            </div>
+        </div>
+        
+        <!-- Export Complete -->
+        <div id="export-complete" class="card hidden">
+            <h2>✅ Export Complete</h2>
+            
+            <div id="export-summary" class="export-summary">
+                <!-- Populated by JS -->
+            </div>
+            
+            <div class="form-actions">
+                <button class="btn btn-primary" onclick="resetExport()">
+                    📥 Export More
+                </button>
+                <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                    🏠 Home
+                </a>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>OneNote Web Exporter &copy; 2025 | Part of Microsoft Backup Suite</p>
+    </footer>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+    <script>
+        let notebooks = [];
+        let eventSource = null;
+        
+        async function loadNotebooks() {
+            const loading = document.getElementById('notebooks-loading');
+            const selection = document.getElementById('notebooks-selection');
+            
+            try {
+                const response = await fetch('/api/notebooks');
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to load notebooks');
+                }
+                
+                notebooks = data.notebooks;
+                renderNotebookSelection(notebooks);
+                
+                // Load settings for export folder
+                const settingsResponse = await fetch('/api/settings');
+                const settings = await settingsResponse.json();
+                document.getElementById('export-folder').value = 
+                    settings.export?.output_root || '';
+                
+                loading.classList.add('hidden');
+                selection.classList.remove('hidden');
+                
+            } catch (err) {
+                loading.innerHTML = `<p class="error">Error: ${err.message}</p>`;
+            }
+        }
+        
+        function renderNotebookSelection(notebooks) {
+            const container = document.getElementById('notebook-checkboxes');
+            
+            let html = '';
+            notebooks.forEach(nb => {
+                html += `
+                <label class="checkbox-label notebook-checkbox">
+                    <input type="checkbox" name="notebook" value="${nb.id}" checked>
+                    <span class="notebook-info">
+                        <strong>📓 ${escapeHtml(nb.name)}</strong>
+                        <small>${nb.page_count} pages in ${nb.section_count} sections</small>
+                    </span>
+                </label>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        function toggleSelectAll() {
+            const selectAll = document.getElementById('select-all');
+            const checkboxes = document.querySelectorAll('input[name="notebook"]');
+            checkboxes.forEach(cb => cb.checked = selectAll.checked);
+        }
+        
+        async function startExport() {
+            const selectedNotebooks = Array.from(
+                document.querySelectorAll('input[name="notebook"]:checked')
+            ).map(cb => cb.value);
+            
+            const exportFolder = document.getElementById('export-folder').value;
+            
+            if (selectedNotebooks.length === 0) {
+                alert('Please select at least one notebook to export');
+                return;
+            }
+            
+            // Show progress UI
+            document.getElementById('export-setup').classList.add('hidden');
+            document.getElementById('export-progress').classList.remove('hidden');
+            
+            // Clear log
+            document.getElementById('progress-log').innerHTML = '';
+            
+            try {
+                const response = await fetch('/api/export/start', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        notebook_ids: selectedNotebooks,
+                        export_folder: exportFolder
+                    })
+                });
+                
+                if (!response.ok) {
+                    const data = await response.json();
+                    throw new Error(data.error || 'Failed to start export');
+                }
+                
+                // Start SSE stream
+                startProgressStream();
+                
+            } catch (err) {
+                addLogEntry('error', `Failed to start export: ${err.message}`);
+            }
+        }
+        
+        function startProgressStream() {
+            eventSource = new EventSource('/api/export/stream');
+            
+            eventSource.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                
+                if (data.done) {
+                    eventSource.close();
+                    showExportComplete(data.result, data.error);
+                    return;
+                }
+                
+                updateProgress(data);
+            };
+            
+            eventSource.onerror = function() {
+                eventSource.close();
+                addLogEntry('error', 'Connection lost - checking status...');
+                checkExportStatus();
+            };
+        }
+        
+        function updateProgress(data) {
+            // Update progress bar
+            const percent = data.percent || 0;
+            document.getElementById('progress-fill').style.width = `${percent}%`;
+            document.getElementById('progress-percent').textContent = `${Math.round(percent)}%`;
+            
+            // Update stats
+            document.getElementById('stat-stage').textContent = data.stage || '-';
+            document.getElementById('stat-current').textContent = 
+                data.total > 0 ? `${data.current} / ${data.total}` : '-';
+            document.getElementById('stat-notebook').textContent = data.notebook || '-';
+            document.getElementById('stat-section').textContent = data.section || '-';
+            
+            // Add log entry
+            if (data.message) {
+                addLogEntry(data.stage, data.message);
+            }
+        }
+        
+        function addLogEntry(stage, message) {
+            const log = document.getElementById('progress-log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${stage}`;
+            entry.innerHTML = `<span class="log-time">${new Date().toLocaleTimeString()}</span> ${escapeHtml(message)}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        async function checkExportStatus() {
+            try {
+                const response = await fetch('/api/export/status');
+                const data = await response.json();
+                
+                if (data.complete) {
+                    showExportComplete(data.result, data.error);
+                } else if (data.running) {
+                    // Reconnect to stream
+                    setTimeout(startProgressStream, 1000);
+                }
+            } catch (err) {
+                addLogEntry('error', 'Failed to check status');
+            }
+        }
+        
+        async function cancelExport() {
+            if (!confirm('Are you sure you want to cancel the export?')) return;
+            
+            try {
+                await fetch('/api/export/cancel', {method: 'POST'});
+                addLogEntry('cancelled', 'Export cancelled by user');
+            } catch (err) {
+                addLogEntry('error', 'Failed to cancel export');
+            }
+        }
+        
+        function showExportComplete(result, error) {
+            document.getElementById('export-progress').classList.add('hidden');
+            document.getElementById('export-complete').classList.remove('hidden');
+            
+            const summaryDiv = document.getElementById('export-summary');
+            
+            if (error) {
+                summaryDiv.innerHTML = `<p class="error">Export failed: ${escapeHtml(error)}</p>`;
+                return;
+            }
+            
+            if (result) {
+                const stats = result.stats || {};
+                summaryDiv.innerHTML = `
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <span class="summary-value">${stats.notebooks || 0}</span>
+                        <span class="summary-label">Notebooks</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-value">${stats.sections || 0}</span>
+                        <span class="summary-label">Sections</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-value">${stats.pages || 0}</span>
+                        <span class="summary-label">Pages</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-value">${stats.images || 0}</span>
+                        <span class="summary-label">Images</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-value">${stats.errors || 0}</span>
+                        <span class="summary-label">Errors</span>
+                    </div>
+                </div>
+                <p class="success-message">✅ Export completed successfully!</p>
+                `;
+            }
+        }
+        
+        function resetExport() {
+            document.getElementById('export-complete').classList.add('hidden');
+            document.getElementById('export-setup').classList.remove('hidden');
+            document.getElementById('progress-fill').style.width = '0%';
+            document.getElementById('progress-percent').textContent = '0%';
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', loadNotebooks);
+    </script>
+</body>
+</html>

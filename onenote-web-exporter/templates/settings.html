@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - OneNote Web Exporter</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <span class="logo">📓</span>
+            <span>OneNote Web Exporter</span>
+        </div>
+        <div class="nav-links">
+            <a href="{{ url_for('index') }}">Home</a>
+            <a href="{{ url_for('browse_page') }}">Browse</a>
+            <a href="{{ url_for('export_page') }}">Export</a>
+            <a href="{{ url_for('settings_page') }}" class="active">Settings</a>
+        </div>
+    </nav>
+
+    <main class="container">
+        <h1>⚙️ Settings</h1>
+        
+        <div class="card">
+            <h2>Microsoft Azure App Registration</h2>
+            <p class="help-text">You need a Microsoft Azure app registration to access the OneNote API.</p>
+            
+            <details class="setup-guide">
+                <summary>📋 How to create an Azure App Registration</summary>
+                <ol>
+                    <li>Go to <a href="https://entra.microsoft.com/" target="_blank">Microsoft Entra admin center</a></li>
+                    <li>Navigate to <strong>Applications</strong> → <strong>App registrations</strong></li>
+                    <li>Click <strong>New registration</strong></li>
+                    <li>Enter a name (e.g., "OneNote Exporter")</li>
+                    <li>Set <strong>Supported account types</strong> to "Personal Microsoft accounts only"</li>
+                    <li>Set <strong>Redirect URI</strong> to: <code>http://localhost:8080/auth/callback</code></li>
+                    <li>Click <strong>Register</strong></li>
+                    <li>Copy the <strong>Application (client) ID</strong></li>
+                    <li>Go to <strong>Certificates & secrets</strong> → <strong>New client secret</strong></li>
+                    <li>Copy the secret <strong>Value</strong> (not the ID)</li>
+                    <li>Go to <strong>API permissions</strong> → <strong>Add a permission</strong></li>
+                    <li>Add these Microsoft Graph permissions:
+                        <ul>
+                            <li>Notes.Read</li>
+                            <li>Notes.Read.All</li>
+                            <li>User.Read</li>
+                        </ul>
+                    </li>
+                </ol>
+            </details>
+            
+            <form id="settings-form" class="form">
+                <div class="form-group">
+                    <label for="client_id">Application (Client) ID</label>
+                    <input type="text" id="client_id" name="client_id" 
+                           value="{{ settings.get('auth', {}).get('client_id', '') }}"
+                           placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="client_secret">Client Secret</label>
+                    <input type="password" id="client_secret" name="client_secret" 
+                           placeholder="Enter client secret" required>
+                    <small>Your current secret is saved. Leave blank to keep existing.</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="tenant">Tenant</label>
+                    <select id="tenant" name="tenant">
+                        <option value="consumers" {% if settings.get('auth', {}).get('tenant', 'consumers') == 'consumers' %}selected{% endif %}>
+                            Personal Microsoft Accounts (consumers)
+                        </option>
+                        <option value="common" {% if settings.get('auth', {}).get('tenant') == 'common' %}selected{% endif %}>
+                            Any Microsoft Account (common)
+                        </option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="export_folder">Export Folder</label>
+                    <input type="text" id="export_folder" name="export_folder" 
+                           value="{{ settings.get('export', {}).get('output_root', '') }}"
+                           placeholder="C:\OneNote-Exports">
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Save Settings</button>
+                </div>
+                
+                <div id="settings-message" class="message hidden"></div>
+            </form>
+        </div>
+    </main>
+
+    <footer>
+        <p>OneNote Web Exporter &copy; 2025 | Part of Microsoft Backup Suite</p>
+    </footer>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+    <script>
+        document.getElementById('settings-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const messageDiv = document.getElementById('settings-message');
+            const formData = {
+                client_id: document.getElementById('client_id').value,
+                client_secret: document.getElementById('client_secret').value,
+                tenant: document.getElementById('tenant').value,
+                export_folder: document.getElementById('export_folder').value
+            };
+            
+            // If secret is empty, we need to indicate to keep existing
+            if (!formData.client_secret) {
+                messageDiv.className = 'message error';
+                messageDiv.textContent = 'Client secret is required';
+                messageDiv.classList.remove('hidden');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(formData)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    messageDiv.className = 'message success';
+                    messageDiv.textContent = '✓ Settings saved successfully!';
+                    messageDiv.classList.remove('hidden');
+                    
+                    // Redirect to home after delay
+                    setTimeout(() => window.location.href = '/', 1500);
+                } else {
+                    messageDiv.className = 'message error';
+                    messageDiv.textContent = data.error || 'Failed to save settings';
+                    messageDiv.classList.remove('hidden');
+                }
+            } catch (err) {
+                messageDiv.className = 'message error';
+                messageDiv.textContent = 'Network error: ' + err.message;
+                messageDiv.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
